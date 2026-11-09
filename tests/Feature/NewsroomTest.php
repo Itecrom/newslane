@@ -6,12 +6,15 @@ use App\Models\Article;
 use App\Models\Advertisement;
 use App\Models\Category;
 use App\Models\Comment;
+use App\Models\ContactMessage;
 use App\Models\LiveEvent;
 use App\Models\Subscriber;
 use App\Models\User;
+use App\Mail\ContactSubmissionNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
 use Illuminate\Support\Facades\Schema;
@@ -37,6 +40,65 @@ class NewsroomTest extends TestCase
         $this->get(route('category.show', 'politics'))
             ->assertOk()
             ->assertSee($article->title);
+    }
+
+    public function test_newsroom_seeds_sections_for_jobs_technology_entertainment_and_business(): void
+    {
+        $this->seed();
+
+        foreach (['malawi', 'politics', 'africa', 'international', 'business', 'health', 'sports', 'entertainment', 'technology', 'jobs-internships', 'culture', 'opinion'] as $slug) {
+            $this->assertDatabaseHas('categories', ['slug' => $slug]);
+        }
+
+        foreach (['international', 'business', 'entertainment', 'technology', 'jobs-internships'] as $slug) {
+            $this->assertDatabaseHas('categories', ['slug' => $slug, 'show_on_homepage' => true]);
+        }
+    }
+
+    public function test_homepage_shows_configured_sections_breaking_thumbnails_carousel_and_live_video(): void
+    {
+        $category = Category::create([
+            'name' => 'Entertainment',
+            'slug' => 'entertainment',
+            'show_on_homepage' => true,
+        ]);
+        $first = $this->publishedArticle($category, [
+            'title' => 'Featured newsroom story one',
+            'slug' => 'featured-newsroom-story-one',
+            'featured' => true,
+            'breaking' => true,
+            'cover_image' => 'articles/one.jpg',
+            'image_alt' => 'An editorial photograph of a public event',
+        ]);
+        $this->publishedArticle($category, [
+            'title' => 'Featured newsroom story two',
+            'slug' => 'featured-newsroom-story-two',
+            'featured' => true,
+        ]);
+        $this->publishedArticle($category, [
+            'title' => 'Entertainment section article',
+            'slug' => 'entertainment-section-article',
+        ]);
+        $event = LiveEvent::create([
+            'title' => 'Live newsroom video',
+            'slug' => 'live-newsroom-video',
+            'summary' => 'An authorized privacy-enhanced newsroom video.',
+            'status' => 'live',
+            'video_embed_url' => 'https://www.youtube-nocookie.com/embed/abcdefghijk',
+        ]);
+
+        $response = $this->get(route('home'))
+            ->assertOk()
+            ->assertSee('data-carousel', false)
+            ->assertSee('data-carousel-slide', false)
+            ->assertSee('Breaking')
+            ->assertSee('Most read')
+            ->assertSee('Entertainment')
+            ->assertSee($first->image_alt)
+            ->assertSee($event->video_embed_url)
+            ->assertHeader('Content-Security-Policy');
+
+        $this->assertSame(3, substr_count($response->getContent(), 'data-carousel-slide'));
     }
 
     public function test_public_story_uses_root_slug_and_search_metadata(): void
@@ -268,6 +330,105 @@ class NewsroomTest extends TestCase
         $this->assertDatabaseHas('article_likes', ['article_id' => $article->id]);
         $this->assertNotNull($response->getCookie('news_visitor'));
         $this->assertFalse(Schema::hasColumn('article_likes', 'ip_address'));
+    }
+
+    public function test_contact_form_routes_general_advertising_and_news_submissions_to_the_right_desks(): void
+    {
+        Storage::fake('local');
+        Mail::fake();
+        $category = Category::create(['name' => 'Jobs & Internships', 'slug' => 'jobs-internships']);
+
+        $this->get(route('contact'))
+            ->assertOk()
+            ->assertSee('info@newslane.africa')
+            ->assertSee('sales@newslane.africa')
+            ->assertSee('editor@newslane.africa')
+            ->assertSee('News tip or original story submission')
+            ->assertSee('rights_confirmation');
+
+        $this->post(route('contact.store'), [
+            'request_type' => 'general',
+            'name' => 'Reader Example',
+            'email' => 'reader@example.test',
+            'subject' => 'A question for NEWSLANE',
+            'message' => 'I have a question for the independent NEWSLANE team.',
+        ])->assertRedirect(route('contact'));
+
+        $general = ContactMessage::where('request_type', 'general')->firstOrFail();
+        $this->assertSame('new', $general->status);
+
+        $response = $this->from(route('contact'))->post(route('contact.store'), [
+            'request_type' => 'news',
+            'name' => 'Original Reporter',
+            'email' => 'reporter@example.test',
+            'subject' => 'An original public interest story',
+            'news_headline' => 'A locally reported community story',
+            'category_id' => $category->id,
+            'source_attribution' => 'My original interview notes and a photo I took.',
+            'message' => 'I witnessed and reported this original local story.',
+            'rights_confirmation' => '1',
+            'attachment' => UploadedFile::fake()->image('original-photo.jpg'),
+        ])->assertRedirect(route('contact'));
+
+        $submission = ContactMessage::where('request_type', 'news')->firstOrFail();
+        $this->assertSame($category->id, $submission->category_id);
+        Mail::assertSent(ContactSubmissionNotification::class, fn ($mail) => $mail->hasTo('info@newslane.africa'));
+        Mail::assertSent(ContactSubmissionNotification::class, fn ($mail) => $mail->contact->is($submission) && $mail->hasTo('editor@newslane.africa'));
+        $this->assertTrue(Storage::disk('local')->exists($submission->attachment_path));
+
+        $this->post(route('contact.store'), [
+            'request_type' => 'advertising',
+            'name' => 'Local Advertiser',
+            'email' => 'advertiser@example.test',
+            'subject' => 'Advertising placement',
+            'message' => 'We would like to discuss advertising with your commercial team.',
+            'campaign_budget' => 'MWK 250,000',
+            'campaign_start' => '2026-12-01',
+            'campaign_end' => '2026-12-15',
+        ])->assertRedirect(route('contact'));
+
+        $this->assertDatabaseHas('contact_messages', ['request_type' => 'advertising', 'campaign_budget' => 'MWK 250,000']);
+        Mail::assertSent(ContactSubmissionNotification::class, fn ($mail) => $mail->hasTo('sales@newslane.africa'));
+    }
+
+    public function test_news_submission_requires_rights_confirmation_and_news_details(): void
+    {
+        $this->from(route('contact'))->post(route('contact.store'), [
+            'request_type' => 'news',
+            'name' => 'Reporter',
+            'email' => 'reporter@example.test',
+            'subject' => 'A news tip',
+            'message' => 'A news submission describing an original verified event.',
+        ])->assertRedirect(route('contact'))->assertSessionHasErrors(['news_headline', 'category_id', 'source_attribution', 'rights_confirmation']);
+
+        $this->assertDatabaseCount('contact_messages', 0);
+    }
+
+    public function test_contact_attachments_are_private_and_restricted_to_administrators(): void
+    {
+        Storage::fake('local');
+        $response = $this->post(route('contact.store'), [
+            'request_type' => 'general',
+            'name' => 'Reader Example',
+            'email' => 'reader@example.test',
+            'subject' => 'A question for NEWSLANE',
+            'message' => 'I have a document I would like to share privately.',
+            'attachment' => UploadedFile::fake()->createWithContent('private.pdf', "%PDF-1.7\nPrivate NEWSLANE submission\n"),
+        ])->assertRedirect(route('contact'));
+        $contact = ContactMessage::firstOrFail();
+        $this->assertTrue(Storage::disk('local')->exists($contact->attachment_path));
+
+        $this->get(route('admin.inquiries.attachment', $contact))->assertRedirect(route('login'));
+
+        $admin = User::create([
+            'name' => 'NEWSLANE Administrator',
+            'email' => 'contact-admin@example.test',
+            'password' => Hash::make('A-long-test-password-2026!'),
+            'role' => 'admin',
+        ]);
+        $download = $this->actingAs($admin)->get(route('admin.inquiries.attachment', $contact));
+        $download->assertOk()->assertHeader('X-Content-Type-Options', 'nosniff');
+        $download->assertHeader('content-disposition', 'attachment; filename='.basename($contact->attachment_path));
     }
 
     private function publishedArticle(?Category $category = null, array $overrides = []): Article

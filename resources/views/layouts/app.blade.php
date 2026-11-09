@@ -25,7 +25,7 @@
     <div class="topbar">
         <div class="shell topbar-inner">
             <span>Independent journalism. African perspectives.</span>
-            <span class="topbar-right">Malawi <span class="dot">•</span> Africa <span class="dot">•</span> World <span class="topbar-divider">|</span> <time id="local-clock">{{ now()->timezone('Africa/Blantyre')->format('D, d M Y · H:i') }}</time> CAT</span>
+            <span class="topbar-right"><a href="{{ route('contact') }}">Contact NEWSLANE</a> <span class="topbar-divider">|</span> Malawi <span class="dot">•</span> Africa <span class="dot">•</span> World <span class="topbar-divider">|</span> <time id="local-clock">{{ now()->timezone('Africa/Blantyre')->format('D, d M Y · H:i') }}</time> CAT</span>
         </div>
     </div>
 
@@ -77,6 +77,7 @@
                 <strong>Explore</strong>
                 <a href="{{ route('home') }}">Latest news</a>
                 <a href="{{ route('live.index') }}">Live coverage</a>
+                <a href="{{ route('contact') }}">Contact NEWSLANE</a>
                 <a href="{{ route('sitemap') }}">Sitemap</a>
             </div>
             <div class="footer-newsletter">
@@ -90,6 +91,7 @@
                 </form>
             </div>
         </div>
+        <div class="shell footer-contacts"><a href="mailto:info@newslane.africa">info@newslane.africa</a><a href="mailto:sales@newslane.africa">sales@newslane.africa</a><a href="mailto:editor@newslane.africa">editor@newslane.africa</a></div>
         <div class="shell footer-bottom"><span>© {{ now()->year }} NEWSLANE. All rights reserved.</span><a href="{{ route('admin.login') }}">Editorial access</a></div>
     </footer>
     <script src="{{ asset('js/site.js') }}" defer></script>

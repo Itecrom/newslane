@@ -20,6 +20,8 @@ class Article extends Model
         'image_alt',
         'status',
         'meta_description',
+        'source_name',
+        'source_url',
         'featured',
         'breaking',
         'published_at',

@@ -11,6 +11,7 @@
         <a class="stat-card" href="{{ route('admin.articles.index') }}"><span>Drafts</span><strong>{{ number_format($stats['drafts']) }}</strong><small>Ready for review</small><i>↗</i></a>
         <a class="stat-card stat-red" href="{{ route('admin.comments.index') }}"><span>Comments to review</span><strong>{{ number_format($stats['comments']) }}</strong><small>Awaiting moderation</small><i>↗</i></a>
         <a class="stat-card" href="{{ route('admin.live.index') }}"><span>Live coverage</span><strong>{{ number_format($stats['live']) }}</strong><small>Active now</small><i>↗</i></a>
+        @if (auth()->user()->isAdmin())<a class="stat-card stat-red" href="{{ route('admin.inquiries.index') }}"><span>New inquiries</span><strong>{{ number_format($stats['inquiries']) }}</strong><small>Administrator review</small><i>↗</i></a>@endif
     </div>
     <div class="admin-content-grid">
         <section class="admin-panel"><div class="panel-heading"><div><p class="eyebrow">EDITORIAL</p><h2>Recent stories</h2></div><a href="{{ route('admin.articles.index') }}">All stories →</a></div>

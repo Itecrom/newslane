@@ -13,7 +13,7 @@
 @push('head')
     <meta property="article:published_time" content="{{ $article->published_at->toIso8601String() }}">
     <meta property="article:section" content="{{ $article->category->name }}">
-    <script type="application/ld+json">{{ \Illuminate\Support\Js::from(['@context' => 'https://schema.org', '@type' => 'NewsArticle', 'headline' => $article->title, 'description' => $article->meta_description ?: $article->excerpt, 'datePublished' => $article->published_at->toIso8601String(), 'dateModified' => $article->updated_at->toIso8601String(), 'author' => ['@type' => 'Person', 'name' => $article->author->name], 'image' => $article->cover_image ? asset('storage/'.$article->cover_image) : asset('images/newslane-brand-board.png'), 'mainEntityOfPage' => route('articles.show', $article->slug)]) }}</script>
+    <script type="application/ld+json" nonce="{{ $cspNonce }}">{{ \Illuminate\Support\Js::from(['@context' => 'https://schema.org', '@type' => 'NewsArticle', 'headline' => $article->title, 'description' => $article->meta_description ?: $article->excerpt, 'datePublished' => $article->published_at->toIso8601String(), 'dateModified' => $article->updated_at->toIso8601String(), 'author' => ['@type' => 'Person', 'name' => $article->author->name], 'image' => $article->cover_image ? asset('storage/'.$article->cover_image) : asset('images/newslane-brand-board.png'), 'mainEntityOfPage' => route('articles.show', $article->slug)]) }}</script>
 @endpush
 
 @section('content')
@@ -32,6 +32,9 @@
                     <figure class="article-cover"><img src="{{ asset('storage/'.$article->cover_image) }}" alt="{{ $article->image_alt ?: $article->title }}"><figcaption>{{ $article->image_alt ?: $article->title }} <span>NEWSLANE</span></figcaption></figure>
                 @endif
                 <div class="article-body">{!! nl2br(e($article->body)) !!}</div>
+                @if ($article->source_name)
+                    <p class="article-source"><strong>Reporting credit:</strong> {{ $article->source_name }}@if ($article->source_url) · <a href="{{ $article->source_url }}" target="_blank" rel="noopener noreferrer">Original source ↗</a>@endif</p>
+                @endif
                 <div class="article-actions">
                     <form action="{{ route('articles.like', $article->slug) }}" method="post">@csrf<button class="like-button {{ $liked ? 'is-liked' : '' }}" type="submit" aria-pressed="{{ $liked ? 'true' : 'false' }}"><span aria-hidden="true">♥</span> {{ $liked ? 'Liked' : 'Like this story' }} <small>{{ number_format($article->likes_count) }}</small></button></form>
                     <div class="share-actions"><span>Share this story</span><button type="button" class="share-native" data-share-title="{{ $article->title }}" data-share-url="{{ route('articles.show', $article->slug) }}">Share</button><a href="https://www.facebook.com/sharer/sharer.php?u={{ urlencode(route('articles.show', $article->slug)) }}" target="_blank" rel="noopener noreferrer">Facebook</a><a href="https://twitter.com/intent/tweet?url={{ urlencode(route('articles.show', $article->slug)) }}&text={{ urlencode($article->title) }}" target="_blank" rel="noopener noreferrer">X</a></div>

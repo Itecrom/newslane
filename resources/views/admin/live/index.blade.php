@@ -17,6 +17,7 @@
             <label>Event headline<input name="title" required maxlength="200" placeholder="What are we covering?"></label>
             <label>Public URL slug <span class="field-help">Optional; generated from the headline.</span><input name="slug" maxlength="190"></label>
             <label>Brief summary<textarea name="summary" rows="4" required maxlength="500" placeholder="A short overview for readers"></textarea></label>
+            <label>Live video embed (optional) <span class="field-help">Secure privacy-enhanced YouTube URL: https://www.youtube-nocookie.com/embed/VIDEO_ID</span><input type="url" name="video_embed_url" maxlength="255" placeholder="https://www.youtube-nocookie.com/embed/VIDEO_ID"></label>
             <button class="button button-blue" type="submit">Start live coverage <span>→</span></button>
         </form><p class="form-note">Updates are published immediately with a timestamp and editor attribution. Verify information before publishing.</p></section>
     </div>

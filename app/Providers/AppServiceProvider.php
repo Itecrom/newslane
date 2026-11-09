@@ -27,7 +27,7 @@ class AppServiceProvider extends ServiceProvider
 
         RateLimiter::for('login', fn ($request) => Limit::perMinute(6)->by($request->ip()));
 
-        View::composer('*', function ($view): void {
+        View::composer('layouts.app', function ($view): void {
             $view->with('navCategories', Category::where('in_menu', true)->orderBy('position')->orderBy('name')->get());
         });
     }

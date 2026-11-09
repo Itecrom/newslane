@@ -11,6 +11,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\Support\Str;
+use RuntimeException;
 
 class ArticleAdminController extends Controller
 {
@@ -62,6 +63,8 @@ class ArticleAdminController extends Controller
             'body' => ['required', 'string', 'min:20'],
             'status' => ['required', Rule::in(['draft', 'published'])],
             'meta_description' => ['nullable', 'string', 'max:160'],
+            'source_name' => ['nullable', 'string', 'max:180'],
+            'source_url' => ['nullable', 'url:https', 'max:2048'],
             'image_alt' => ['nullable', 'string', 'max:180'],
             'cover' => ['nullable', 'image', 'max:5120'],
             'featured' => ['sometimes', 'boolean'],
@@ -76,7 +79,13 @@ class ArticleAdminController extends Controller
 
         if ($request->hasFile('cover')) {
             $previousCover = $article->cover_image;
-            $data['cover_image'] = Storage::disk('public')->putFile('articles', $request->file('cover'));
+            $coverPath = Storage::disk('public')->putFile('articles', $request->file('cover'));
+
+            if (! is_string($coverPath)) {
+                throw new RuntimeException('Unable to store the story cover image.');
+            }
+
+            $data['cover_image'] = $coverPath;
         }
 
         $data['slug'] = $slug;

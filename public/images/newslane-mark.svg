@@ -1,6 +1,33 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title">
-  <title id="title">NEWSLANE</title>
-  <rect width="64" height="64" rx="14" fill="#0B2D6B"/>
-  <path d="M15 48V16h8l18 21V16h8v32h-8L23 27v21z" fill="#fff"/>
-  <path d="M11 49 49 20" fill="none" stroke="#E10600" stroke-linecap="round" stroke-width="5"/>
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<!-- Creator: CorelDRAW -->
+<svg xmlns="http://www.w3.org/2000/svg" xml:space="preserve" width="8.5in" height="8.5in" version="1.1" style="shape-rendering:geometricPrecision; text-rendering:geometricPrecision; image-rendering:optimizeQuality; fill-rule:evenodd; clip-rule:evenodd"
+viewBox="0 0 8500 8500"
+ xmlns:xlink="http://www.w3.org/1999/xlink"
+ xmlns:xodm="http://www.corel.com/coreldraw/odm/2003">
+ <defs>
+  <style type="text/css">
+   <![CDATA[
+    .str2 {stroke:#FEFEFE;stroke-width:20.83;stroke-miterlimit:2.61313}
+    .str0 {stroke:#FEFEFE;stroke-width:6.94;stroke-miterlimit:2.61313}
+    .str1 {stroke:#002161;stroke-width:6.94;stroke-miterlimit:2.61313}
+    .fil3 {fill:none}
+    .fil1 {fill:#FEFEFE}
+    .fil2 {fill:#DC0103}
+    .fil0 {fill:url(#id0)}
+   ]]>
+  </style>
+  <linearGradient id="id0" gradientUnits="userSpaceOnUse" x1="4232.46" y1="6195.28" x2="4232.46" y2="-3526.49">
+   <stop offset="0" style="stop-opacity:1; stop-color:#002161"/>
+   <stop offset="1" style="stop-opacity:1; stop-color:#0072FE"/>
+  </linearGradient>
+ </defs>
+ <g id="Layer_x0020_1">
+  <metadata id="CorelCorpID_0Corel-Layer"/>
+  <rect class="fil0" x="447.54" y="448.76" width="7569.79" height="7569.79" rx="1176.06" ry="1176.06"/>
+  <path class="fil1 str0" d="M4035.5 5259.07c332.02,343.74 661.1,693.78 993.05,1033.12 381.77,390.29 709.94,525.66 1261.41,468.53 337.7,-34.99 266.52,76.8 267.91,-281.67 3.81,-982.93 1.69,-1967.33 0.33,-2951.15 -438.44,235.37 -834.87,470.51 -1192.62,705.31l13.15 828.36c-155.58,-172.44 -311.06,-344.44 -466.31,-516.37 -329.51,238.38 -620.62,476.37 -876.91,713.87zm2522.52 -1867.74l-0.02 -18.46c-29.15,15.65 -58.11,31.29 -86.88,46.94 28.91,-9.58 57.88,-19.07 86.91,-28.48z"/>
+  <path class="fil1 str0" d="M2978.96 5030.17l68.82 -940.61 482.46 495.15c314.43,-232.56 644.15,-442.53 987.27,-632.68 -375.45,-417.36 -748.98,-836.04 -1118.93,-1261.16 -500.35,-574.96 -690.01,-523.08 -1393.54,-542.06 -181.8,-4.91 -133.53,-68.78 -136.83,192.22 -16.41,1302.35 -13.49,2613.64 -18,3918.35 341.71,-460.8 719.57,-868.15 1128.74,-1229.22zm3578.87 -1949.07c-0.29,-245.09 -0.48,-738.38 -0.48,-983.35l-1219.26 0 18.9 1438.63c387.33,-170.91 788.37,-321.56 1200.84,-455.28z"/>
+  <path class="fil2 str1" d="M2818.02 6728.34l-996.82 14 19.13 -237.03c1329.94,-1801.09 3513.96,-3173.74 5356.2,-3383.08 -2459.54,1211.47 -3810.11,2343.15 -4378.51,3606.1z"/>
+  <rect class="fil3 str2" x="757.12" y="758.35" width="6950.63" height="6950.63" rx="1079.86" ry="1079.86"/>
+ </g>
 </svg>

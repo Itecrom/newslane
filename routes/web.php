@@ -10,6 +10,7 @@ use App\Http\Controllers\Admin\LiveAdminController;
 use App\Http\Controllers\Admin\UserAdminController;
 use App\Http\Controllers\ArticleController;
 use App\Http\Controllers\CategoryController;
+use App\Http\Controllers\ContactController;
 use App\Http\Controllers\HomeController;
 use App\Http\Controllers\LiveController;
 use App\Http\Controllers\NewsletterController;
@@ -24,6 +25,8 @@ Route::get('/live', [LiveController::class, 'index'])->name('live.index');
 Route::get('/live/{event:slug}/updates', [LiveController::class, 'updates'])->name('live.updates');
 Route::get('/live/{event:slug}', [LiveController::class, 'show'])->name('live.show');
 Route::get('/search', SearchController::class)->name('search');
+Route::get('/contact', [ContactController::class, 'show'])->name('contact');
+Route::post('/contact', [ContactController::class, 'store'])->middleware('throttle:3,10')->name('contact.store');
 Route::post('/newsletter', [NewsletterController::class, 'store'])->middleware('throttle:3,10')->name('newsletter.store');
 Route::get('/newsletter/confirm/{subscriber}/{token}', [NewsletterController::class, 'confirm'])
     ->middleware(['signed', 'throttle:10,1'])->name('newsletter.confirm');
@@ -33,8 +36,9 @@ Route::get('/login', fn () => redirect()->route('admin.login'))->name('login');
 
 Route::get('/sitemap.xml', function () {
     $articles = Article::published()->latest('published_at')->get(['slug', 'updated_at']);
+    $categories = \App\Models\Category::orderBy('position')->get(['slug']);
 
-    return response()->view('sitemap', compact('articles'))->header('Content-Type', 'application/xml; charset=UTF-8');
+    return response()->view('sitemap', compact('articles', 'categories'))->header('Content-Type', 'application/xml; charset=UTF-8');
 })->name('sitemap');
 
 Route::prefix('admin')->name('admin.')->group(function (): void {
@@ -67,6 +71,10 @@ Route::prefix('admin')->name('admin.')->group(function (): void {
         Route::post('/live/{event}/updates', [LiveAdminController::class, 'addUpdate'])->name('live.updates.store');
         Route::delete('/live/{event}', [LiveAdminController::class, 'destroy'])->name('live.destroy');
         Route::middleware('administrator')->group(function (): void {
+            Route::get('/inquiries', [\App\Http\Controllers\Admin\ContactMessageAdminController::class, 'index'])->name('inquiries.index');
+            Route::get('/inquiries/{contact}', [\App\Http\Controllers\Admin\ContactMessageAdminController::class, 'show'])->name('inquiries.show');
+            Route::patch('/inquiries/{contact}', [\App\Http\Controllers\Admin\ContactMessageAdminController::class, 'update'])->name('inquiries.update');
+            Route::get('/inquiries/{contact}/attachment', [\App\Http\Controllers\Admin\ContactMessageAdminController::class, 'attachment'])->name('inquiries.attachment');
             Route::get('/users', [UserAdminController::class, 'index'])->name('users.index');
             Route::post('/users', [UserAdminController::class, 'store'])->name('users.store');
             Route::patch('/users/{user}', [UserAdminController::class, 'update'])->name('users.update');

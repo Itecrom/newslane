@@ -4,12 +4,15 @@ namespace App\Http\Middleware;
 
 use Closure;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\View;
 use Symfony\Component\HttpFoundation\Response;
 
 class SecurityHeaders
 {
     public function handle(Request $request, Closure $next): Response
     {
+        $nonce = base64_encode(random_bytes(16));
+        View::share('cspNonce', $nonce);
         $response = $next($request);
         $response->headers->set('X-Content-Type-Options', 'nosniff');
         $response->headers->set('X-Frame-Options', 'SAMEORIGIN');
@@ -17,7 +20,7 @@ class SecurityHeaders
         $response->headers->set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
         $response->headers->set(
             'Content-Security-Policy',
-            "default-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; font-src 'self'; object-src 'none'",
+            "default-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'; frame-src https://www.youtube-nocookie.com; img-src 'self' data:; style-src 'self'; script-src 'self' 'nonce-{$nonce}'; font-src 'self'; object-src 'none'",
         );
 
         if ($request->isSecure() && app()->environment('production')) {

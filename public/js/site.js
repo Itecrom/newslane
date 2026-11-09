@@ -108,3 +108,74 @@ if (liveTimeline) {
 
     window.setInterval(refresh, 15_000);
 }
+
+document.querySelectorAll('[data-carousel]').forEach((carousel) => {
+    const slides = Array.from(carousel.querySelectorAll('[data-carousel-slide]'));
+    const dots = Array.from(carousel.querySelectorAll('[data-carousel-dot]'));
+
+    if (slides.length < 2) {
+        return;
+    }
+
+    let active = 0;
+    let timer;
+
+    const show = (next) => {
+        active = (next + slides.length) % slides.length;
+
+        slides.forEach((slide, index) => {
+            slide.hidden = index !== active;
+            slide.classList.toggle('is-active', index === active);
+            slide.setAttribute('aria-hidden', index === active ? 'false' : 'true');
+        });
+
+        dots.forEach((dot, index) => {
+            dot.setAttribute('aria-pressed', index === active ? 'true' : 'false');
+        });
+    };
+
+    const stop = () => window.clearInterval(timer);
+    const start = () => {
+        stop();
+        if (!document.hidden && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+            timer = window.setInterval(() => show(active + 1), Number(carousel.dataset.carouselInterval) || 7000);
+        }
+    };
+
+    carousel.querySelector('[data-carousel-prev]')?.addEventListener('click', () => { show(active - 1); start(); });
+    carousel.querySelector('[data-carousel-next]')?.addEventListener('click', () => { show(active + 1); start(); });
+    dots.forEach((dot) => dot.addEventListener('click', () => {
+        show(Number(dot.dataset.carouselDot));
+        start();
+    }));
+
+    carousel.addEventListener('mouseenter', stop);
+    carousel.addEventListener('mouseleave', start);
+    carousel.addEventListener('focusin', stop);
+    carousel.addEventListener('focusout', start);
+    document.addEventListener('visibilitychange', start);
+    start();
+});
+
+document.querySelectorAll('[data-contact-type]').forEach((select) => {
+    const form = select.form;
+
+    const updateSections = () => {
+        form.querySelectorAll('[data-contact-section]').forEach((section) => {
+            const isVisible = section.dataset.contactSection === select.value;
+            section.hidden = !isVisible;
+            section.querySelectorAll('input, select, textarea').forEach((input) => {
+                input.disabled = !isVisible;
+            });
+        });
+
+        form.querySelectorAll('[data-contact-message-label] textarea').forEach((textarea) => {
+            textarea.placeholder = select.value === 'news'
+                ? 'Describe your original news tip or submission; include what happened, where and when.'
+                : 'Tell us what we need to know (20–5,000 characters).';
+        });
+    };
+
+    select.addEventListener('change', updateSections);
+    updateSections();
+});

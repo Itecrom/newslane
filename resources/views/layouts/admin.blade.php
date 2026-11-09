@@ -12,6 +12,7 @@
                 <a class="{{ request()->routeIs('admin.ads.*') ? 'active' : '' }}" href="{{ route('admin.ads.index') }}"><span>▧</span> Advertising</a>
                 <a class="{{ request()->routeIs('admin.live.*') ? 'active' : '' }}" href="{{ route('admin.live.index') }}"><span>◉</span> Live coverage</a>
                 @if (auth()->user()->isAdmin())<a class="{{ request()->routeIs('admin.users.*') ? 'active' : '' }}" href="{{ route('admin.users.index') }}"><span>♙</span> Staff accounts</a>@endif
+                @if (auth()->user()->isAdmin())<a class="{{ request()->routeIs('admin.inquiries.*') ? 'active' : '' }}" href="{{ route('admin.inquiries.index') }}"><span>✉</span> Inquiries</a>@endif
                 <a href="{{ route('home') }}" target="_blank" rel="noopener"><span>↗</span> View website</a>
             </nav>
             <form action="{{ route('admin.logout') }}" method="post">@csrf<button class="sidebar-logout" type="submit">Sign out <span>↗</span></button></form>

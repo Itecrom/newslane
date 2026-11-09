@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class LiveEvent extends Model
 {
-    protected $fillable = ['title', 'slug', 'summary', 'status', 'started_at', 'ended_at'];
+    protected $fillable = ['title', 'slug', 'summary', 'video_embed_url', 'status', 'started_at', 'ended_at'];
 
     protected function casts(): array
     {

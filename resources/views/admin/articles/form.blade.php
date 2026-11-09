@@ -13,6 +13,8 @@
             <label>Summary <span class="field-help">Shown on article cards and in search results (max 320 characters).</span><textarea name="excerpt" rows="3" maxlength="320" required>{{ old('excerpt', $article->excerpt) }}</textarea></label>
             <label>Story body <span class="field-help">Plain text is safely escaped on publication. Separate paragraphs with a blank line.</span><textarea class="body-editor" name="body" rows="18" required minlength="20">{{ old('body', $article->body) }}</textarea></label>
             <label>SEO description <span class="field-help">Optional. Defaults to the story summary (max 160 characters).</span><textarea name="meta_description" rows="2" maxlength="160">{{ old('meta_description', $article->meta_description) }}</textarea></label>
+            <label>Reporting credit / source name <span class="field-help">Credit licensed or referenced reporting, original contributors and photographers.</span><input name="source_name" value="{{ old('source_name', $article->source_name) }}" maxlength="180" placeholder="Publication, original source, reporter, or photographer"></label>
+            <label>Original source URL <span class="field-help">Link to the referenced source when appropriate; only secure HTTPS links are accepted.</span><input type="url" name="source_url" value="{{ old('source_url', $article->source_url) }}" maxlength="2048" placeholder="https://..."></label>
         </div>
         <aside class="editor-settings">
             <h2>Story settings</h2>

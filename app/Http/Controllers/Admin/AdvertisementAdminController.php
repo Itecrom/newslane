@@ -8,6 +8,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
+use RuntimeException;
 
 class AdvertisementAdminController extends Controller
 {
@@ -28,7 +29,13 @@ class AdvertisementAdminController extends Controller
             'starts_at' => ['nullable', 'date'],
             'ends_at' => ['nullable', 'date', 'after_or_equal:starts_at'],
         ]);
-        $data['image_path'] = Storage::disk('public')->putFile('ads', $request->file('image'));
+        $imagePath = Storage::disk('public')->putFile('ads', $request->file('image'));
+
+        if (! is_string($imagePath)) {
+            throw new RuntimeException('Unable to store the advertisement image.');
+        }
+
+        $data['image_path'] = $imagePath;
         $data['active'] = $request->boolean('active');
         Advertisement::create($data);
 
@@ -47,7 +54,13 @@ class AdvertisementAdminController extends Controller
         ]);
         if ($request->hasFile('image')) {
             $previousImage = $advertisement->image_path;
-            $data['image_path'] = Storage::disk('public')->putFile('ads', $request->file('image'));
+            $imagePath = Storage::disk('public')->putFile('ads', $request->file('image'));
+
+            if (! is_string($imagePath)) {
+                throw new RuntimeException('Unable to store the replacement advertisement image.');
+            }
+
+            $data['image_path'] = $imagePath;
         }
         $data['active'] = $request->boolean('active');
         unset($data['image']);

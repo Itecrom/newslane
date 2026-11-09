@@ -26,12 +26,14 @@ class CategoryAdminController extends Controller
             'slug' => ['nullable', 'string', 'max:120', 'regex:/^[a-z0-9]+(?:-[a-z0-9]+)*$/', 'unique:categories,slug'],
             'description' => ['nullable', 'string', 'max:500'],
             'position' => ['nullable', 'integer', 'min:0', 'max:65535'],
+            'show_on_homepage' => ['sometimes', 'boolean'],
         ]);
         $data['slug'] = ($data['slug'] ?? null) ?: Str::slug($data['name']);
         if (Category::where('slug', $data['slug'])->exists()) {
             $data['slug'] .= '-'.Str::lower(Str::random(5));
         }
         $data['in_menu'] = $request->boolean('in_menu');
+        $data['show_on_homepage'] = $request->boolean('show_on_homepage');
         Category::create($data);
 
         return back()->with('status', 'Category created.');
@@ -44,8 +46,10 @@ class CategoryAdminController extends Controller
             'slug' => ['required', 'string', 'max:120', 'regex:/^[a-z0-9]+(?:-[a-z0-9]+)*$/', Rule::unique('categories', 'slug')->ignore($category->id)],
             'description' => ['nullable', 'string', 'max:500'],
             'position' => ['nullable', 'integer', 'min:0', 'max:65535'],
+            'show_on_homepage' => ['sometimes', 'boolean'],
         ]);
         $data['in_menu'] = $request->boolean('in_menu');
+        $data['show_on_homepage'] = $request->boolean('show_on_homepage');
         $category->update($data);
 
         return back()->with('status', 'Category updated.');

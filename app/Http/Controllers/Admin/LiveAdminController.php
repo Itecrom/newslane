@@ -25,6 +25,7 @@ class LiveAdminController extends Controller
             'title' => ['required', 'string', 'max:200'],
             'slug' => ['nullable', 'string', 'max:190', 'regex:/^[a-z0-9]+(?:-[a-z0-9]+)*$/', 'unique:live_events,slug'],
             'summary' => ['required', 'string', 'max:500'],
+            'video_embed_url' => ['nullable', 'url:https', 'regex:~\Ahttps://www\.youtube-nocookie\.com/embed/[A-Za-z0-9_-]{11}(?:\?[A-Za-z0-9_=&%-]+)?\z~', 'max:255'],
         ]);
         $data['slug'] = ($data['slug'] ?? null) ?: Str::slug($data['title']);
         if (LiveEvent::where('slug', $data['slug'])->exists()) {
