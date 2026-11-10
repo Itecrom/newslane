@@ -60,6 +60,7 @@ Route::prefix('admin')->name('admin.')->group(function (): void {
         Route::get('/articles', [ArticleAdminController::class, 'index'])->name('articles.index');
         Route::get('/articles/create', [ArticleAdminController::class, 'create'])->name('articles.create');
         Route::post('/articles', [ArticleAdminController::class, 'store'])->name('articles.store');
+        Route::post('/articles/{article}/facebook', [ArticleAdminController::class, 'shareOnFacebook'])->name('articles.facebook');
         Route::get('/articles/{article}/edit', [ArticleAdminController::class, 'edit'])->name('articles.edit');
         Route::put('/articles/{article}', [ArticleAdminController::class, 'update'])->name('articles.update');
         Route::delete('/articles/{article}', [ArticleAdminController::class, 'destroy'])->name('articles.destroy');

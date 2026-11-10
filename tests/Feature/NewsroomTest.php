@@ -43,6 +43,8 @@ class NewsroomTest extends TestCase
             ->assertSee('NewsMediaOrganization')
             ->assertSee('SearchAction')
             ->assertSee('@context')
+            ->assertSee('{"@context":', false)
+            ->assertDontSee('style="--rail-rank', false)
             ->assertSee('https://facebook.com/newslanemw', false)
             ->assertSee('data-theme-toggle', false)
             ->assertHeader('X-Content-Type-Options', 'nosniff')
@@ -293,6 +295,9 @@ class NewsroomTest extends TestCase
             ->assertSee('data-carousel-slide', false)
             ->assertSee('Breaking')
             ->assertSee('Most read')
+            ->assertSee('rail-featured', false)
+            ->assertSee('rail-support-grid', false)
+            ->assertSee('rail-support-card', false)
             ->assertSee('Entertainment')
             ->assertDontSee('Illustrative image')
             ->assertDontSee($first->image_caption)
@@ -315,6 +320,7 @@ class NewsroomTest extends TestCase
             ->assertSee('<meta property="og:title" content="'.$article->title.'">', false)
             ->assertSee('NewsArticle')
             ->assertSee('@context')
+            ->assertSee('{"@context":', false)
             ->assertSee(route('articles.show', $article->slug), false)
             ->assertDontSee('00:00 CAT');
 
@@ -573,8 +579,8 @@ class NewsroomTest extends TestCase
         $this->assertSame('An illustrative newsroom photograph.', $article->image_caption);
         $this->assertSame('Photographer Name · CC BY-SA 4.0 · Resized', $article->image_credit);
         $this->assertSame('https://commons.wikimedia.org/wiki/File:Example.jpg', $article->image_credit_url);
-        $this->assertSame('pending', $article->facebook_post_status);
-        Queue::assertPushed(PublishArticleToFacebook::class, fn (PublishArticleToFacebook $job): bool => $job->articleId === $article->id);
+        $this->assertSame('not_configured', $article->facebook_post_status);
+        Queue::assertNotPushed(PublishArticleToFacebook::class);
         $this->get(route('articles.show', $article->slug))
             ->assertOk()
             ->assertSee('<meta property="og:image" content="'.asset('storage/'.$article->cover_image).'">', false)
@@ -658,7 +664,7 @@ class NewsroomTest extends TestCase
         $this->assertNull($article->facebook_post_id);
     }
 
-    public function test_scheduled_articles_queue_facebook_posts_for_their_publication_time(): void
+    public function test_scheduled_articles_wait_for_an_editor_to_share_them_to_facebook(): void
     {
         $this->freezeTime();
         $publishedAt = now()->addHour()->startOfMinute();
@@ -680,22 +686,17 @@ class NewsroomTest extends TestCase
             'title' => 'A scheduled Facebook story',
             'category_id' => $category->id,
             'excerpt' => 'A summary for this scheduled story.',
-            'body' => 'This scheduled article will be automatically shared when it goes live.',
+            'body' => 'This scheduled article waits for an editor to share it after publication.',
             'status' => 'published',
             'published_at' => $publishedAt->format('Y-m-d\TH:i'),
         ])->assertRedirect(route('admin.articles.index'));
 
         $article = Article::where('title', 'A scheduled Facebook story')->firstOrFail();
-        Queue::assertPushed(
-            PublishArticleToFacebook::class,
-            fn (PublishArticleToFacebook $job): bool => $job->articleId === $article->id
-                && $job->publicationTimestamp === $publishedAt->timestamp
-                && $job->delay instanceof \DateTimeInterface
-                && $job->delay->getTimestamp() === $publishedAt->timestamp,
-        );
+        $this->assertSame('not_configured', $article->facebook_post_status);
+        Queue::assertNotPushed(PublishArticleToFacebook::class);
     }
 
-    public function test_publishing_without_facebook_credentials_records_that_sharing_is_not_configured(): void
+    public function test_publishing_a_story_does_not_share_it_to_facebook_automatically(): void
     {
         config([
             'services.facebook_page.page_id' => null,
@@ -720,10 +721,126 @@ class NewsroomTest extends TestCase
 
         $article = Article::where('title', 'A story without Facebook configuration')->firstOrFail();
         $this->assertSame('not_configured', $article->facebook_post_status);
-        $this->assertSame(
-            'Set a Facebook Page ID and Page access token in the application environment to enable automatic sharing.',
-            $article->facebook_post_error,
+        $this->assertNull($article->facebook_post_error);
+        Queue::assertNotPushed(PublishArticleToFacebook::class);
+    }
+
+    public function test_editors_can_choose_to_queue_a_published_story_to_facebook(): void
+    {
+        Queue::fake([PublishArticleToFacebook::class]);
+        $editor = User::create([
+            'name' => 'Facebook Desk Editor',
+            'email' => 'facebook-desk-editor@example.test',
+            'password' => Hash::make('A-long-test-password-2026!'),
+            'role' => 'editor',
+        ]);
+        $article = $this->publishedArticle(overrides: ['title' => 'A story selected for Facebook']);
+
+        $this->actingAs($editor)->get(route('admin.articles.index'))
+            ->assertOk()
+            ->assertSee('Post to Facebook')
+            ->assertSee(route('admin.articles.facebook', $article), false);
+
+        $this->actingAs($editor)->from(route('admin.articles.index'))
+            ->post(route('admin.articles.facebook', $article))
+            ->assertRedirect(route('admin.articles.index'))
+            ->assertSessionHas('status', 'Facebook post queued. Its status will update when the publishing job completes.');
+
+        $this->assertDatabaseHas('articles', [
+            'id' => $article->id,
+            'facebook_post_status' => 'pending',
+            'facebook_post_error' => null,
+        ]);
+        Queue::assertPushed(
+            PublishArticleToFacebook::class,
+            fn (PublishArticleToFacebook $job): bool => $job->articleId === $article->id
+                && $job->publicationTimestamp === $article->published_at->timestamp,
         );
+    }
+
+    public function test_reporters_cannot_queue_facebook_posts(): void
+    {
+        Queue::fake([PublishArticleToFacebook::class]);
+        $reporter = User::create([
+            'name' => 'Staff Reporter',
+            'email' => 'facebook-reporter@example.test',
+            'password' => Hash::make('A-long-test-password-2026!'),
+            'role' => 'reporter',
+        ]);
+        $article = $this->publishedArticle();
+
+        $this->actingAs($reporter)->post(route('admin.articles.facebook', $article))
+            ->assertForbidden();
+
+        $this->assertDatabaseHas('articles', [
+            'id' => $article->id,
+            'facebook_post_status' => 'not_configured',
+            'facebook_post_id' => null,
+        ]);
+        Queue::assertNotPushed(PublishArticleToFacebook::class);
+    }
+
+    public function test_scheduled_stories_cannot_be_queued_to_facebook_before_publication(): void
+    {
+        $this->freezeTime();
+        Queue::fake([PublishArticleToFacebook::class]);
+        $editor = User::create([
+            'name' => 'Facebook Desk Editor',
+            'email' => 'scheduled-facebook-desk@example.test',
+            'password' => Hash::make('A-long-test-password-2026!'),
+            'role' => 'editor',
+        ]);
+        $article = $this->publishedArticle(overrides: ['published_at' => now()->addHour()]);
+
+        $this->actingAs($editor)->from(route('admin.articles.index'))
+            ->post(route('admin.articles.facebook', $article))
+            ->assertRedirect(route('admin.articles.index'))
+            ->assertSessionHasErrors('facebook_post');
+
+        $this->assertDatabaseHas('articles', [
+            'id' => $article->id,
+            'facebook_post_status' => 'not_configured',
+            'facebook_post_id' => null,
+        ]);
+        Queue::assertNotPushed(PublishArticleToFacebook::class);
+    }
+
+    public function test_facebook_action_does_not_duplicate_queued_or_posted_stories(): void
+    {
+        Queue::fake([PublishArticleToFacebook::class]);
+        $editor = User::create([
+            'name' => 'Facebook Desk Editor',
+            'email' => 'duplicate-facebook-desk@example.test',
+            'password' => Hash::make('A-long-test-password-2026!'),
+            'role' => 'editor',
+        ]);
+        $category = Category::create(['name' => 'Malawi', 'slug' => 'malawi']);
+        $queuedArticle = $this->publishedArticle($category);
+        $queuedArticle->forceFill(['facebook_post_status' => 'pending'])->save();
+        $postedArticle = $this->publishedArticle($category);
+        $postedArticle->forceFill([
+            'facebook_post_status' => 'posted',
+            'facebook_post_id' => '1234567890_9876543210',
+        ])->save();
+
+        $this->actingAs($editor)->from(route('admin.articles.index'))
+            ->post(route('admin.articles.facebook', $queuedArticle))
+            ->assertRedirect(route('admin.articles.index'))
+            ->assertSessionHas('status', 'A Facebook post for this story is already queued or in progress.');
+        $this->post(route('admin.articles.facebook', $postedArticle))
+            ->assertRedirect(route('admin.articles.index'))
+            ->assertSessionHas('status', 'This story has already been posted to Facebook.');
+
+        $this->assertDatabaseHas('articles', [
+            'id' => $queuedArticle->id,
+            'facebook_post_status' => 'pending',
+            'facebook_post_id' => null,
+        ]);
+        $this->assertDatabaseHas('articles', [
+            'id' => $postedArticle->id,
+            'facebook_post_status' => 'posted',
+            'facebook_post_id' => '1234567890_9876543210',
+        ]);
         Queue::assertNotPushed(PublishArticleToFacebook::class);
     }
 

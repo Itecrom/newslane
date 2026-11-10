@@ -8,7 +8,7 @@
 @section('canonical', route('home'))
 
 @push('head')
-    <script type="application/ld+json" nonce="{{ $cspNonce }}">{{ \Illuminate\Support\Js::from([
+    <script type="application/ld+json" nonce="{{ $cspNonce }}">{!! \Illuminate\Support\Js::encode([
         '@@context' => 'https://schema.org',
         '@graph' => [
             [
@@ -37,7 +37,7 @@
                 ],
             ],
         ],
-    ]) }}</script>
+    ]) !!}</script>
 @endpush
 
 @section('content')
@@ -124,17 +124,49 @@
         @endif
 
         <aside class="lead-rail" aria-label="Most read stories" data-reveal>
-            <div class="section-heading"><div><p class="eyebrow">READER FAVOURITES</p><h2>Most read</h2></div><span class="heading-rule"></span></div>
+            <div class="rail-heading">
+                <div><p class="eyebrow">READER FAVOURITES</p><h2>Most read</h2></div>
+                <span class="rail-period"><i></i> TOP STORIES</span>
+            </div>
             @forelse ($popular as $index => $story)
-                <article class="rail-story" style="--rail-rank: {{ $index }}">
-                    <span class="rail-number">{{ str_pad($index + 1, 2, '0', STR_PAD_LEFT) }}</span>
-                    <a class="rail-thumb" href="{{ route('articles.show', $story->slug) }}" aria-label="{{ $story->title }}">@if ($story->cover_image)<img src="{{ asset('storage/'.$story->cover_image) }}" alt="{{ $story->image_alt ?: $story->title }}" loading="lazy">@else<span>{{ strtoupper(substr($story->category->name ?? 'N', 0, 1)) }}</span>@endif</a>
-                    <div><span class="rail-category">{{ $story->category->name }}</span><h3><a href="{{ route('articles.show', $story->slug) }}">{{ $story->title }}</a></h3><small>{{ number_format($story->views) }} reads</small></div>
-                </article>
+                @if ($index === 0)
+                    <a class="rail-featured" href="{{ route('articles.show', $story->slug) }}" aria-label="Most read: {{ $story->title }}">
+                        @if ($story->cover_image)
+                            <img src="{{ asset('storage/'.$story->cover_image) }}" alt="{{ $story->image_alt ?: $story->title }}" loading="lazy">
+                        @else
+                            <span class="rail-featured-placeholder" aria-hidden="true">{{ strtoupper(substr($story->category->name ?? 'N', 0, 1)) }}</span>
+                        @endif
+                        <span class="rail-featured-shade"></span>
+                        <span class="rail-featured-rank"><b>01</b><span>MOST READ</span></span>
+                        <span class="rail-featured-copy"><span class="rail-category">{{ $story->category->name }}</span><strong>{{ $story->title }}</strong><small>{{ number_format($story->views) }} reads <i></i> Read story <b aria-hidden="true">→</b></small></span>
+                    </a>
+                    @if (! $loop->last)
+                        <div class="rail-support-grid" aria-label="More most-read stories">
+                    @endif
+                @else
+                    <article class="rail-support-card">
+                        <a href="{{ route('articles.show', $story->slug) }}" aria-label="Number {{ str_pad($index + 1, 2, '0', STR_PAD_LEFT) }}: {{ $story->title }}">
+                            <span class="rail-support-image">
+                                @if ($story->cover_image)
+                                    <img src="{{ asset('storage/'.$story->cover_image) }}" alt="" loading="lazy">
+                                @else
+                                    <span class="rail-support-placeholder" aria-hidden="true">{{ strtoupper(substr($story->category->name ?? 'N', 0, 1)) }}</span>
+                                @endif
+                                <b>{{ str_pad($index + 1, 2, '0', STR_PAD_LEFT) }}</b>
+                            </span>
+                            <span class="rail-category">{{ $story->category->name }}</span>
+                            <strong>{{ $story->title }}</strong>
+                            <small>{{ number_format($story->views) }} reads</small>
+                        </a>
+                    </article>
+                    @if ($loop->last)
+                        </div>
+                    @endif
+                @endif
             @empty
                 <div class="rail-empty"><span class="rail-number">01</span><span class="rail-thumb"><span>N</span></span><p>Our newsroom is preparing the first edition. Check back soon.</p></div>
             @endforelse
-            <div class="rail-values"><span>INDEPENDENT</span><i></i><span>IN-DEPTH</span><i></i><span>PUBLIC INTEREST</span></div>
+            <div class="rail-values"><span>THE STORIES READERS ARE FOLLOWING</span><i></i><span>UPDATED DAILY</span></div>
         </aside>
     </section>
 

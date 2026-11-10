@@ -7,6 +7,7 @@ use App\Jobs\PublishArticleToFacebook;
 use App\Models\Article;
 use App\Models\Category;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -48,6 +49,51 @@ class ArticleAdminController extends Controller
         abort_unless($request->user()->canEditArticle($article), 403);
 
         return $this->save($request, $article);
+    }
+
+    public function shareOnFacebook(Request $request, Article $article): RedirectResponse
+    {
+        abort_unless($request->user()->canPublishArticles(), 403);
+
+        if ($article->status !== 'published' || ! $article->published_at || $article->published_at->isFuture()) {
+            return back()->withErrors(['facebook_post' => 'Only publicly published stories can be posted to Facebook.']);
+        }
+
+        if ($article->facebook_post_id) {
+            return back()->with('status', 'This story has already been posted to Facebook.');
+        }
+
+        $queued = Article::query()
+            ->whereKey($article->id)
+            ->where('status', 'published')
+            ->whereNotNull('published_at')
+            ->where('published_at', '<=', now())
+            ->whereNull('facebook_post_id')
+            ->where(fn (Builder $query): Builder => $query
+                ->whereNull('facebook_post_status')
+                ->orWhereNotIn('facebook_post_status', ['pending', 'publishing']))
+            ->update([
+                'facebook_post_status' => 'pending',
+                'facebook_post_error' => null,
+            ]);
+
+        if ($queued !== 1) {
+            $article->refresh();
+
+            if ($article->facebook_post_id) {
+                return back()->with('status', 'This story has already been posted to Facebook.');
+            }
+
+            if (in_array($article->facebook_post_status, ['pending', 'publishing'], true)) {
+                return back()->with('status', 'A Facebook post for this story is already queued or in progress.');
+            }
+
+            return back()->withErrors(['facebook_post' => 'This story is no longer eligible for Facebook sharing.']);
+        }
+
+        dispatch((new PublishArticleToFacebook($article->id, $article->published_at->timestamp))->afterCommit());
+
+        return back()->with('status', 'Facebook post queued. Its status will update when the publishing job completes.');
     }
 
     public function destroy(Article $article): RedirectResponse
@@ -121,35 +167,6 @@ class ArticleAdminController extends Controller
         unset($data['cover'], $data['video_url']);
 
         $article->fill($data)->save();
-
-        if ($article->status === 'published' && ! $article->facebook_post_id) {
-            $pageId = config('services.facebook_page.page_id');
-            $accessToken = config('services.facebook_page.page_access_token');
-            $graphApiVersion = config('services.facebook_page.graph_api_version');
-            $facebookReady = is_string($pageId) && ctype_digit($pageId)
-                && is_string($accessToken) && $accessToken !== ''
-                && is_string($graphApiVersion) && preg_match('/^v[0-9]+\.[0-9]+$/D', $graphApiVersion) === 1;
-
-            if ($facebookReady) {
-                $article->forceFill([
-                    'facebook_post_status' => 'pending',
-                    'facebook_post_error' => null,
-                ])->save();
-
-                $facebookJob = new PublishArticleToFacebook($article->id, $article->published_at->timestamp);
-
-                if ($article->published_at?->isFuture()) {
-                    $facebookJob->delay($article->published_at);
-                }
-
-                dispatch($facebookJob->afterCommit());
-            } else {
-                $article->forceFill([
-                    'facebook_post_status' => 'not_configured',
-                    'facebook_post_error' => 'Set a Facebook Page ID and Page access token in the application environment to enable automatic sharing.',
-                ])->save();
-            }
-        }
 
         if (isset($previousCover) && $previousCover) {
             Storage::disk('public')->delete($previousCover);
