@@ -4,6 +4,12 @@ Independent journalism from Malawi, Africa and the world. **Your World. Your New
 
 NEWSLANE is a Laravel 13 newsroom application built for PHP 8.3+ and MySQL. Its public site and editorial control centre share the same content, moderation and publishing workflows.
 
+## Site and credits
+
+- Live website: [newslane.africa](https://newslane.africa)
+- Built and hosted by [Itec ICT Solutions](https://itecictsolutions.com)
+- Lead developer: [Leonard Mhone](https://lm.itecictsolutions.com)
+
 ## What is included
 
 - Responsive homepage with breaking-news ticker, automatically rotating featured stories, thumbnails in most-read lists, editor-selected category sections, privacy-enhanced live video, category navigation and search.
@@ -43,11 +49,19 @@ NEWSLANE is a Laravel 13 newsroom application built for PHP 8.3+ and MySQL. Its 
 7. Configure `MAIL_FROM_ADDRESS=info@newslane.africa` and ensure each contact address can receive email. Contact enquiries are also stored in the administrator-only **Inquiries** area. Review privacy, retention and submission-consent policies before accepting real submissions.
 8. Configure a commercial Open-Meteo API subscription and add its API key as `OPEN_METEO_API_KEY` in `.env`. The weather widget uses the commercial customer endpoint; Open-Meteo's free API is not licensed for an ad-supported website. Forecasts are cached for ten minutes, refresh in open pages every ten minutes, and include attribution in the widget. After changing `.env`, clear Laravel's configuration cache with `php artisan config:clear` (or rebuild it with `php artisan config:cache` for production).
 9. Google AdSense uses `ADSENSE_CLIENT_ID` (defaulting to the supplied NEWSLANE publisher ID) and can be switched on or off by an administrator under **Google AdSense**. Google Auto ads placement, site verification and approval are managed in the AdSense account; serving is not guaranteed until Google approves the site. Publish the required privacy and consent disclosures before monetizing visitors.
-10. To publish articles automatically to the NEWSLANE Facebook Page, configure `FACEBOOK_PAGE_ID`, `FACEBOOK_PAGE_ACCESS_TOKEN` and `FACEBOOK_GRAPH_API_VERSION` in `.env`. Create a Meta app with the Page publishing permission (`pages_manage_posts`) and grant its Page access token the Page's **Create content** task. Keep the token secret; never send it in chat or commit it. The site queues a link post after an article is published, and Facebook reads the article's Open Graph title, description and featured image for its preview. Run a queue worker continuously with `php artisan queue:work --tries=1`; use your process manager to restart it after deployment. Automatic posting requires an HTTPS public `APP_URL` and publicly accessible article/image URLs; localhost preview pages cannot be fetched by Facebook. Failed posts are shown in the article editor; check the Page before manually retrying to avoid duplicate posts.
+10. To post a published article to the NEWSLANE Facebook Page, configure `FACEBOOK_PAGE_ID`, `FACEBOOK_PAGE_ACCESS_TOKEN` and `FACEBOOK_GRAPH_API_VERSION` in `.env`. Create a Meta app with the Page publishing permission (`pages_manage_posts`) and grant its Page access token the Page's **Create content** task. Keep the token secret; never send it in chat or commit it. An editor or administrator can choose **Post to Facebook** for an eligible story in the dashboard; publishing a story on NEWSLANE does not automatically publish it on Facebook. Facebook reads the article's Open Graph title, description and featured image for its link preview. Run a queue worker continuously with `php artisan queue:work --tries=1`; use your process manager to restart it after deployment. Posting requires an HTTPS public `APP_URL` and publicly accessible article/image URLs; localhost preview pages cannot be fetched by Facebook. Failed posts are shown in the dashboard; check the Page before retrying to avoid duplicates.
 
 For a quick WAMP development install, SQLite avoids requiring a database server: use `DB_CONNECTION=sqlite`, set `DB_DATABASE` to `database/database.sqlite`, enable `pdo_sqlite`, create the empty file, then run `php artisan migrate --seed`. You still need `php artisan news:admin:create "News Editor" editor@newslane.com` to create the first staff login.
 
 For a quick local-only preview after configuring the database, `php artisan serve` is also available. Set `APP_URL` to match the URL you use so signed newsletter links and canonical metadata work correctly.
+
+## Current production issue
+
+As of November 11, 2026, story creation and editing on the production site can return HTTP 500. The latest reported Laravel error is `Call to undefined function Illuminate\Support\mb_strimwidth()`, which indicates `mbstring` is not loaded by the PHP web handler serving `newslane.africa`. Cover-image uploads also require the web handler's `fileinfo` extension.
+
+Both extensions appeared enabled in cPanel's PHP Selector, but applying the selector settings failed with “No users correspond to the domain `newslane.africa.itecictsolutions.com`.” The site is an addon domain under the existing `itecictsolutions.com` cPanel account. Hosting support needs to repair the CloudLinux PHP Selector mapping and confirm `mbstring` and `fileinfo` are loaded for web requests, then reload the relevant PHP handler. CLI extension checks alone do not verify the web runtime.
+
+The application timezone now uses `APP_TIMEZONE` and defaults to `Africa/Blantyre`. Production previously confirmed `Africa/Blantyre`; this corrected scheduled publication times being interpreted as UTC. If a story still returns 404, verify that it is published and its publication time is not in the future.
 
 ## Editorial workflow
 
@@ -59,6 +73,7 @@ For a quick local-only preview after configuring the database, `php artisan serv
 - Reader comments are private to the editorial desk until approved. Likes use a random, encrypted browser cookie; no raw IP address is stored.
 - Manage homepage ads and live coverage from their dashboard sections. Live updates publish immediately with the signed-in editor's name and timestamp.
 - Administrators can enable or disable the Google AdSense loader in **Google AdSense**. Auto ads placement is configured in the associated Google account.
+- Editors and administrators can manually queue a published story to Facebook from its **Stories** row; pending and completed posts are clearly marked to prevent accidental duplicates.
 - The **Contact NEWSLANE** page routes general inquiries to `info@newslane.africa`, advertising to `sales@newslane.africa` and original story submissions to `editor@newslane.africa`. A submission appears as unreviewed content; editors still review and publish stories themselves.
 - YouTube live-video embeds accept privacy-enhanced `youtube-nocookie.com` embed URLs only. Add legally cleared footage and imagery through the editorial tools.
 

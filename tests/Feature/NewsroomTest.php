@@ -541,6 +541,33 @@ class NewsroomTest extends TestCase
         $this->assertStringContainsString('https://googleads.g.doubleclick.net', $response->headers->get('Content-Security-Policy'));
     }
 
+    public function test_editor_published_at_uses_malawi_local_time_and_is_public_immediately(): void
+    {
+        $this->travelTo(new \DateTimeImmutable('2026-11-10T20:27:00+00:00'));
+
+        $editor = User::create([
+            'name' => 'Desk Editor',
+            'email' => 'local-time-editor@example.test',
+            'password' => Hash::make('A-long-test-password-2026!'),
+            'role' => 'editor',
+        ]);
+        $category = Category::create(['name' => 'Malawi', 'slug' => 'malawi']);
+
+        $this->actingAs($editor)->post(route('admin.articles.store'), [
+            'title' => 'Story published at Malawi local time',
+            'category_id' => $category->id,
+            'excerpt' => 'A concise summary for a time-zone regression test.',
+            'body' => 'This story is scheduled for the current Malawi-local time.',
+            'status' => 'published',
+            'published_at' => '2026-11-10T22:27',
+        ])->assertRedirect(route('admin.articles.index'));
+
+        $article = Article::where('title', 'Story published at Malawi local time')->firstOrFail();
+
+        $this->assertSame('2026-11-10 20:27:00', $article->published_at->setTimezone('UTC')->format('Y-m-d H:i:s'));
+        $this->get(route('articles.show', $article->slug))->assertOk();
+    }
+
     public function test_editor_can_publish_and_reader_comments_are_moderated(): void
     {
         config([
