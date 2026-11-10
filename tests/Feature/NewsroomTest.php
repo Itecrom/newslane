@@ -39,6 +39,10 @@ class NewsroomTest extends TestCase
             ->assertOk()
             ->assertSee($article->title)
             ->assertSee(route('category.show', 'politics'))
+            ->assertSee('<meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1">', false)
+            ->assertSee('NewsMediaOrganization')
+            ->assertSee('SearchAction')
+            ->assertSee('@context')
             ->assertSee('https://facebook.com/newslanemw', false)
             ->assertSee('data-theme-toggle', false)
             ->assertHeader('X-Content-Type-Options', 'nosniff')
@@ -47,6 +51,118 @@ class NewsroomTest extends TestCase
         $this->get(route('category.show', 'politics'))
             ->assertOk()
             ->assertSee($article->title);
+    }
+
+    public function test_africa_category_includes_malawi_and_editorially_selected_african_stories(): void
+    {
+        Category::create(['name' => 'Africa', 'slug' => 'africa']);
+        $malawi = Category::create(['name' => 'Malawi', 'slug' => 'malawi']);
+        $politics = Category::create(['name' => 'Politics', 'slug' => 'politics']);
+        $international = Category::create(['name' => 'International', 'slug' => 'international']);
+        $malawiStory = $this->publishedArticle($malawi, ['title' => 'Malawi policy update']);
+        $africanPoliticsStory = $this->publishedArticle($politics, [
+            'title' => 'Regional election update',
+            'include_in_africa' => true,
+        ]);
+        $internationalStory = $this->publishedArticle($international, [
+            'title' => 'Kuala Lumpur court update',
+        ]);
+        $ordinaryPoliticsStory = $this->publishedArticle($politics, [
+            'title' => 'European parliament debate',
+        ]);
+
+        $this->get(route('category.show', 'africa'))
+            ->assertOk()
+            ->assertSee($malawiStory->title)
+            ->assertSee($africanPoliticsStory->title)
+            ->assertDontSee($internationalStory->title)
+            ->assertDontSee($ordinaryPoliticsStory->title);
+    }
+
+    public function test_homepage_sections_use_rotating_layouts_and_africa_tagline(): void
+    {
+        $titles = ['Africa layout story', 'Business layout story', 'Health layout story', 'Culture layout story'];
+
+        foreach ([
+            ['name' => 'Africa', 'slug' => 'africa'],
+            ['name' => 'Business', 'slug' => 'business'],
+            ['name' => 'Health', 'slug' => 'health'],
+            ['name' => 'Culture', 'slug' => 'culture'],
+        ] as $index => $attributes) {
+            $category = Category::create($attributes + ['show_on_homepage' => true]);
+            $this->publishedArticle($category, ['title' => $titles[$index]]);
+        }
+
+        $this->get(route('home'))
+            ->assertOk()
+            ->assertSee('From Africa to the world.')
+            ->assertSee('category-home-section--feature', false)
+            ->assertSee('category-home-section--list', false)
+            ->assertSee('category-home-section--mosaic', false)
+            ->assertSee('category-home-section--scroll', false);
+    }
+
+    public function test_administrator_list_pages_are_paginated(): void
+    {
+        $admin = User::create([
+            'name' => 'Pagination Administrator',
+            'email' => 'pagination-admin@example.test',
+            'password' => Hash::make('A-long-test-password-2026!'),
+            'role' => 'admin',
+        ]);
+
+        foreach (range(1, 16) as $number) {
+            Category::create([
+                'name' => 'Pagination category '.$number,
+                'slug' => 'pagination-category-'.$number,
+                'position' => $number,
+                'in_menu' => false,
+            ]);
+            Advertisement::create([
+                'title' => 'Pagination advertisement '.$number,
+                'image_path' => 'ads/test-'.$number.'.jpg',
+                'target_url' => 'https://example.test/'.$number,
+                'placement' => 'homepage',
+                'active' => true,
+            ]);
+        }
+
+        foreach (range(1, 11) as $number) {
+            LiveEvent::create([
+                'title' => 'Pagination live event '.$number,
+                'slug' => 'pagination-live-event-'.$number,
+                'summary' => 'A live-event summary for pagination testing.',
+                'status' => 'closed',
+                'started_at' => now()->subMinutes($number),
+            ]);
+        }
+
+        $this->actingAs($admin)->get(route('admin.categories.index'))
+            ->assertOk()
+            ->assertDontSee('Pagination category 16')
+            ->assertSee(route('admin.categories.index', ['page' => 2]), false);
+
+        $this->get(route('admin.categories.index', ['page' => 2]))
+            ->assertOk()
+            ->assertSee('Pagination category 16');
+
+        $this->get(route('admin.ads.index'))
+            ->assertOk()
+            ->assertDontSee('Pagination advertisement 16')
+            ->assertSee(route('admin.ads.index', ['page' => 2]), false);
+
+        $this->get(route('admin.ads.index', ['page' => 2]))
+            ->assertOk()
+            ->assertSee('Pagination advertisement 16');
+
+        $this->get(route('admin.live.index'))
+            ->assertOk()
+            ->assertDontSee('Pagination live event 11')
+            ->assertSee(route('admin.live.index', ['page' => 2]), false);
+
+        $this->get(route('admin.live.index', ['page' => 2]))
+            ->assertOk()
+            ->assertSee('Pagination live event 11');
     }
 
     public function test_topbar_shows_africa_forecast_and_malawi_conditions_and_caches_provider_response(): void
@@ -197,11 +313,14 @@ class NewsroomTest extends TestCase
         $this->get(route('articles.show', $article->slug))
             ->assertOk()
             ->assertSee('<meta property="og:title" content="'.$article->title.'">', false)
+            ->assertSee('NewsArticle')
+            ->assertSee('@context')
             ->assertSee(route('articles.show', $article->slug), false)
             ->assertDontSee('00:00 CAT');
 
         $this->get(route('search', ['q' => 'Malawi']))
             ->assertOk()
+            ->assertSee('<meta name="robots" content="noindex, nofollow">', false)
             ->assertSee($article->title);
 
         $this->get(route('sitemap'))
@@ -460,8 +579,7 @@ class NewsroomTest extends TestCase
             ->assertOk()
             ->assertSee('<meta property="og:image" content="'.asset('storage/'.$article->cover_image).'">', false)
             ->assertSee('<meta property="og:image:alt" content="A descriptive image alt text.">', false)
-            ->assertDontSee($article->image_caption)
-            ->assertDontSee('Illustrative image')
+            ->assertSee($article->image_caption)
             ->assertSee('Photo taken by ', false)
             ->assertSee('Photographer Name · CC BY-SA 4.0')
             ->assertDontSee('resized from original')

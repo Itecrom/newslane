@@ -2,6 +2,43 @@
 
 @section('title', 'NEWSLANE | Your World. Your News.')
 @section('meta_description', 'Independent and credible journalism from Malawi, Africa and the world. Get the latest news, analysis and live coverage from NEWSLANE.')
+@section('og_title', 'NEWSLANE | Independent news from Africa and the world')
+@section('og_description', 'Independent journalism. Fearless reporting. The latest news, analysis and live coverage from Malawi, Africa and the world.')
+@section('og_url', route('home'))
+@section('canonical', route('home'))
+
+@push('head')
+    <script type="application/ld+json" nonce="{{ $cspNonce }}">{{ \Illuminate\Support\Js::from([
+        '@@context' => 'https://schema.org',
+        '@graph' => [
+            [
+                '@type' => 'NewsMediaOrganization',
+                '@id' => url('/').'#organization',
+                'name' => 'NEWSLANE',
+                'url' => route('home'),
+                'description' => 'Independent journalism. Fearless reporting. From Africa to the world.',
+                'logo' => [
+                    '@type' => 'ImageObject',
+                    'url' => asset('images/newslane-mark.svg'),
+                ],
+                'sameAs' => ['https://facebook.com/newslanemw'],
+            ],
+            [
+                '@type' => 'WebSite',
+                '@id' => url('/').'#website',
+                'url' => route('home'),
+                'name' => 'NEWSLANE',
+                'publisher' => ['@id' => url('/').'#organization'],
+                'inLanguage' => 'en',
+                'potentialAction' => [
+                    '@type' => 'SearchAction',
+                    'target' => route('search').'?q={search_term_string}',
+                    'query-input' => 'required name=search_term_string',
+                ],
+            ],
+        ],
+    ]) }}</script>
+@endpush
 
 @section('content')
     @if ($breaking->isNotEmpty())
@@ -17,9 +54,16 @@
         </section>
     @endif
 
-    <section class="shell home-intro">
-        <div><p class="eyebrow">{{ strtoupper(now()->timezone('Africa/Blantyre')->format('l, d F Y')) }}</p><h1>The stories that <span>move us.</span></h1></div>
-        <p>Independent journalism. Fearless reporting.<br>From Malawi to the world.</p>
+    <section class="shell home-intro" aria-label="NEWSLANE daily edition">
+        <div class="home-intro-main">
+            <p class="eyebrow"><span>THE DAILY EDITION</span><time datetime="{{ now()->timezone('Africa/Blantyre')->toDateString() }}">{{ strtoupper(now()->timezone('Africa/Blantyre')->format('l, d F Y')) }}</time></p>
+            <h1>The stories that <span>move us.</span></h1>
+        </div>
+        <div class="home-intro-note">
+            <span class="home-intro-mark" aria-hidden="true">N</span>
+            <p><strong>Independent journalism.<br>Fearless reporting.</strong><span>From Africa to the world.</span></p>
+            <span class="home-intro-coverage">MALAWI <i></i> AFRICA <i></i> WORLD</span>
+        </div>
     </section>
 
     @if ($liveEvents->isNotEmpty())
@@ -79,10 +123,10 @@
             </div>
         @endif
 
-        <aside class="lead-rail">
-            <div class="section-heading"><h2>Most read</h2><span class="heading-rule"></span></div>
+        <aside class="lead-rail" aria-label="Most read stories" data-reveal>
+            <div class="section-heading"><div><p class="eyebrow">READER FAVOURITES</p><h2>Most read</h2></div><span class="heading-rule"></span></div>
             @forelse ($popular as $index => $story)
-                <article class="rail-story">
+                <article class="rail-story" style="--rail-rank: {{ $index }}">
                     <span class="rail-number">{{ str_pad($index + 1, 2, '0', STR_PAD_LEFT) }}</span>
                     <a class="rail-thumb" href="{{ route('articles.show', $story->slug) }}" aria-label="{{ $story->title }}">@if ($story->cover_image)<img src="{{ asset('storage/'.$story->cover_image) }}" alt="{{ $story->image_alt ?: $story->title }}" loading="lazy">@else<span>{{ strtoupper(substr($story->category->name ?? 'N', 0, 1)) }}</span>@endif</a>
                     <div><span class="rail-category">{{ $story->category->name }}</span><h3><a href="{{ route('articles.show', $story->slug) }}">{{ $story->title }}</a></h3><small>{{ number_format($story->views) }} reads</small></div>
@@ -98,7 +142,7 @@
         <div class="shell ad-wrap"><a href="{{ $advertisement->target_url }}" target="_blank" rel="sponsored noopener noreferrer"><img src="{{ asset('storage/'.$advertisement->image_path) }}" alt="{{ $advertisement->title }}" loading="lazy"></a><span>Advertisement</span></div>
     @endforeach
 
-    <section class="shell latest-section">
+    <section class="shell latest-section" data-reveal>
         <div class="section-heading"><div><p class="eyebrow">STAY INFORMED</p><h2>Latest stories</h2></div><span class="heading-rule"></span><a href="{{ route('search') }}" class="text-link">Explore all <span>→</span></a></div>
         @if ($latest->isNotEmpty())
             <div class="story-grid">@foreach ($latest as $story) @include('partials.story-card', ['story' => $story]) @endforeach</div>
@@ -108,10 +152,23 @@
     </section>
 
     @foreach ($homeSections as $section)
-        <section class="shell category-home-section">
-            <div class="section-heading"><div><p class="eyebrow">MORE FROM OUR NEWSROOM</p><h2>{{ $section->name }}</h2></div><span class="heading-rule"></span><a href="{{ route('category.show', $section->slug) }}" class="text-link">All {{ $section->name }} <span>→</span></a></div>
-            <div class="story-grid">@foreach ($section->articles as $story) @include('partials.story-card', ['story' => $story]) @endforeach</div>
-        </section>
+        <section @class([
+            'shell',
+            'category-home-section',
+        'category-home-section--feature' => $loop->index % 4 === 0,
+        'category-home-section--list' => $loop->index % 4 === 1,
+        'category-home-section--mosaic' => $loop->index % 4 === 2,
+        'category-home-section--scroll' => $loop->index % 4 === 3,
+    ]) data-reveal>
+        <div class="section-heading"><div><p class="eyebrow">MORE FROM OUR NEWSROOM</p><h2>{{ $section->name }}</h2></div><span class="heading-rule"></span><a href="{{ route('category.show', $section->slug) }}" class="text-link">All {{ $section->name }} <span>→</span></a></div>
+        <div @class([
+            'story-grid',
+            'category-story-grid--feature' => $loop->index % 4 === 0,
+            'category-story-grid--list' => $loop->index % 4 === 1,
+            'category-story-grid--mosaic' => $loop->index % 4 === 2,
+            'category-story-grid--scroll' => $loop->index % 4 === 3,
+        ]) @if ($loop->index % 4 === 3) tabindex="0" role="region" aria-label="Scroll through the latest {{ $section->name }} stories" @endif>@foreach ($section->articles as $story) @include('partials.story-card', ['story' => $story]) @endforeach</div>
+    </section>
     @endforeach
 
     @if ($videoEvents->isNotEmpty())

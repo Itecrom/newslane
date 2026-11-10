@@ -77,6 +77,7 @@ Route::prefix('admin')->name('admin.')->group(function (): void {
             Route::delete('/advertisements/{advertisement}', [AdvertisementAdminController::class, 'destroy'])->name('ads.destroy');
             Route::get('/live', [LiveAdminController::class, 'index'])->name('live.index');
             Route::post('/live', [LiveAdminController::class, 'store'])->name('live.store');
+            Route::delete('/live/{event}', [LiveAdminController::class, 'destroy'])->name('live.destroy');
             Route::patch('/live/{event}/close', [LiveAdminController::class, 'update'])->name('live.close');
             Route::post('/live/{event}/updates', [LiveAdminController::class, 'addUpdate'])->name('live.updates.store');
         });

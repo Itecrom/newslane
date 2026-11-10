@@ -14,7 +14,7 @@ class CategoryAdminController extends Controller
 {
     public function index(): View
     {
-        $categories = Category::withCount('articles')->orderBy('position')->orderBy('name')->get();
+        $categories = Category::withCount('articles')->orderBy('position')->orderBy('name')->paginate(15);
 
         return view('admin.categories.index', compact('categories'));
     }

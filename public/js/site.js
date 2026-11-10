@@ -251,3 +251,21 @@ document.querySelectorAll('[data-contact-type]').forEach((select) => {
     select.addEventListener('change', updateSections);
     updateSections();
 });
+
+const revealTargets = document.querySelectorAll('[data-reveal]');
+const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)');
+
+if (revealTargets.length > 0 && 'IntersectionObserver' in window && !reducedMotion.matches) {
+    document.documentElement.classList.add('has-reveal');
+
+    const revealObserver = new IntersectionObserver((entries, observer) => {
+        entries.forEach((entry) => {
+            if (entry.isIntersecting) {
+                entry.target.classList.add('is-visible');
+                observer.unobserve(entry.target);
+            }
+        });
+    }, { threshold: 0.12 });
+
+    revealTargets.forEach((target) => revealObserver.observe(target));
+}

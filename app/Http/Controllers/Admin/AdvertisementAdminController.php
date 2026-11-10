@@ -14,7 +14,7 @@ class AdvertisementAdminController extends Controller
 {
     public function index(): View
     {
-        $advertisements = Advertisement::latest()->get();
+        $advertisements = Advertisement::latest()->paginate(15);
 
         return view('admin.ads.index', compact('advertisements'));
     }

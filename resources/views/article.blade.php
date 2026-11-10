@@ -13,7 +13,7 @@
 @push('head')
     <meta property="article:published_time" content="{{ $article->published_at->toIso8601String() }}">
     <meta property="article:section" content="{{ $article->category->name }}">
-    <script type="application/ld+json" nonce="{{ $cspNonce }}">{{ \Illuminate\Support\Js::from(['@context' => 'https://schema.org', '@type' => 'NewsArticle', 'headline' => $article->title, 'description' => $article->meta_description ?: $article->excerpt, 'datePublished' => $article->published_at->toIso8601String(), 'dateModified' => $article->updated_at->toIso8601String(), 'author' => ['@type' => 'Person', 'name' => $article->author->name], 'image' => $article->cover_image ? asset('storage/'.$article->cover_image) : asset('images/newslane-brand-board.png'), 'mainEntityOfPage' => route('articles.show', $article->slug)]) }}</script>
+    <script type="application/ld+json" nonce="{{ $cspNonce }}">{{ \Illuminate\Support\Js::from(['@@context' => 'https://schema.org', '@type' => 'NewsArticle', 'headline' => $article->title, 'description' => $article->meta_description ?: $article->excerpt, 'datePublished' => $article->published_at->toIso8601String(), 'dateModified' => $article->updated_at->toIso8601String(), 'author' => ['@type' => 'Person', 'name' => $article->author->name], 'publisher' => ['@type' => 'NewsMediaOrganization', 'name' => 'NEWSLANE', 'url' => route('home'), 'logo' => ['@type' => 'ImageObject', 'url' => asset('images/newslane-mark.svg')]], 'image' => $article->cover_image ? asset('storage/'.$article->cover_image) : asset('images/newslane-brand-board.png'), 'articleSection' => $article->category->name, 'mainEntityOfPage' => route('articles.show', $article->slug)]) }}</script>
 @endpush
 
 @section('content')
@@ -31,9 +31,14 @@
                 @if ($article->cover_image)
                     <figure class="article-cover">
                         <img src="{{ asset('storage/'.$article->cover_image) }}" alt="{{ $article->image_alt ?: $article->title }}">
-                        @if ($article->image_credit)
+                        @if ($article->image_caption || $article->image_credit)
                             <figcaption>
-                                <span>Photo taken by @if ($article->image_credit_url)<a href="{{ $article->image_credit_url }}" target="_blank" rel="noopener noreferrer">{{ $article->image_credit }}</a>@else{{ $article->image_credit }}@endif</span>
+                                @if ($article->image_caption)
+                                    <p>{{ $article->image_caption }}</p>
+                                @endif
+                                @if ($article->image_credit)
+                                    <span>Photo taken by @if ($article->image_credit_url)<a href="{{ $article->image_credit_url }}" target="_blank" rel="noopener noreferrer">{{ $article->image_credit }}</a>@else{{ $article->image_credit }}@endif</span>
+                                @endif
                             </figcaption>
                         @endif
                     </figure>

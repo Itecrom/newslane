@@ -28,6 +28,7 @@ class Article extends Model
         'video_embed_url',
         'featured',
         'breaking',
+        'include_in_africa',
         'published_at',
     ];
 
@@ -36,6 +37,7 @@ class Article extends Model
         return [
             'featured' => 'boolean',
             'breaking' => 'boolean',
+            'include_in_africa' => 'boolean',
             'published_at' => 'datetime',
             'facebook_posted_at' => 'datetime',
         ];

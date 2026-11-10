@@ -8,13 +8,12 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
-use Illuminate\Validation\Rule;
 
 class LiveAdminController extends Controller
 {
     public function index(): View
     {
-        $events = LiveEvent::withCount('updates')->latest()->get();
+        $events = LiveEvent::withCount('updates')->latest()->paginate(10);
 
         return view('admin.live.index', compact('events'));
     }

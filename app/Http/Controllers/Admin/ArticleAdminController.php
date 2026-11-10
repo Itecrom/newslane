@@ -84,6 +84,7 @@ class ArticleAdminController extends Controller
             'cover' => ['nullable', 'image', 'max:5120'],
             'featured' => [$canPublish ? 'sometimes' : 'prohibited', 'boolean'],
             'breaking' => [$canPublish ? 'sometimes' : 'prohibited', 'boolean'],
+            'include_in_africa' => ['sometimes', 'boolean'],
             'published_at' => [$canPublish ? 'nullable' : 'prohibited', 'date'],
         ]);
 
@@ -112,6 +113,8 @@ class ArticleAdminController extends Controller
         }
         $data['featured'] = $canPublish && $request->boolean('featured');
         $data['breaking'] = $canPublish && $request->boolean('breaking');
+        $data['include_in_africa'] = Category::query()->whereKey($data['category_id'])->value('slug') === 'malawi'
+            || $request->boolean('include_in_africa');
         $data['published_at'] = $canPublish && $data['status'] === 'published'
             ? ($data['published_at'] ?? $article->published_at ?? now())
             : null;

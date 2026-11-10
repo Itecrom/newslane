@@ -20,6 +20,7 @@
         <aside class="editor-settings">
             <h2>Story settings</h2>
             <label>Category<select name="category_id" required><option value="">Choose category</option>@foreach ($categories as $category)<option value="{{ $category->id }}" @selected(old('category_id', $article->category_id) == $category->id)>{{ $category->name }}</option>@endforeach</select></label>
+            <label class="checkbox-label"><input type="checkbox" name="include_in_africa" value="1" @checked(old('include_in_africa', $article->include_in_africa || $categories->firstWhere('id', old('category_id', $article->category_id))?->slug === 'malawi'))> Include in the Africa section</label>
             @if (auth()->user()->canPublishArticles())
                 <label>Publication status<select name="status"><option value="draft" @selected(old('status', $article->status ?: 'draft') === 'draft')>Draft</option><option value="published" @selected(old('status', $article->status) === 'published')>Published</option></select></label>
                 <label>Publish date <input type="datetime-local" name="published_at" value="{{ old('published_at', $article->published_at?->format('Y-m-d\TH:i')) }}"></label>

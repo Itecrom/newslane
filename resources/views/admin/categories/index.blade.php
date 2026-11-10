@@ -16,6 +16,7 @@
                     <div class="category-row-footer"><span>{{ $category->articles_count }} {{ Str::plural('story', $category->articles_count) }}</span><button class="small-action" type="submit">Save changes</button></div>
                 </form>
             @empty <p class="admin-quiet">No categories yet. Add one to organize your reporting.</p> @endforelse
+            <div class="pagination-wrap">{{ $categories->links() }}</div>
         </section>
         <section class="admin-panel category-create"><p class="eyebrow">NEW SECTION</p><h2>Add a category</h2><form action="{{ route('admin.categories.store') }}" method="post" class="stack-form">@csrf
             <label>Category name<input name="name" required maxlength="100" placeholder="e.g. Environment"></label>
