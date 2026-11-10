@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
-#[Fillable(['name', 'email', 'password', 'role', 'is_active'])]
+#[Fillable(['name', 'email', 'password', 'role', 'is_active', 'bio'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -37,6 +37,24 @@ class User extends Authenticatable
     public function isAdmin(): bool
     {
         return $this->role === 'admin';
+    }
+
+    public function canManageNewsroom(): bool
+    {
+        return in_array($this->role, ['admin', 'editor'], true);
+    }
+
+    public function canPublishArticles(): bool
+    {
+        return $this->canManageNewsroom();
+    }
+
+    public function canEditArticle(Article $article): bool
+    {
+        return $this->canManageNewsroom()
+            || (in_array($this->role, ['reporter', 'intern'], true)
+                && $article->user_id === $this->id
+                && $article->status === 'draft');
     }
 
     public function articles(): HasMany

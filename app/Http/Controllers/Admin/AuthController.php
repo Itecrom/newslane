@@ -27,7 +27,7 @@ class AuthController extends Controller
                 ->onlyInput('email');
         }
 
-        if (! $request->user()->is_active || ! in_array($request->user()->role, ['admin', 'editor'], true)) {
+        if (! $request->user()->is_active || ! in_array($request->user()->role, ['admin', 'editor', 'reporter', 'intern'], true)) {
             Auth::logout();
             $request->session()->invalidate();
             $request->session()->regenerateToken();

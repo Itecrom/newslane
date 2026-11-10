@@ -10,11 +10,16 @@ use App\Models\Comment;
 use App\Models\ContactMessage;
 use App\Models\LiveEvent;
 use Illuminate\Contracts\View\View;
+use Illuminate\Http\RedirectResponse;
 
 class DashboardController extends Controller
 {
-    public function __invoke(): View
+    public function __invoke(): View|RedirectResponse
     {
+        if (! auth()->user()->canManageNewsroom()) {
+            return redirect()->route('admin.articles.index');
+        }
+
         $stats = [
             'published' => Article::where('status', 'published')->count(),
             'drafts' => Article::where('status', 'draft')->count(),

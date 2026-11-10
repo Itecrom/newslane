@@ -12,5 +12,8 @@
         <h3><a href="{{ route('articles.show', $story->slug) }}">{{ $story->title }}</a></h3>
         <p>{{ $story->excerpt }}</p>
         <div class="story-byline">By {{ $story->author->name ?? 'NEWSLANE Desk' }}</div>
+        @if ($story->image_credit)
+            <div class="story-image-credit">Photo taken by @if ($story->image_credit_url)<a href="{{ $story->image_credit_url }}" target="_blank" rel="noopener noreferrer">{{ $story->image_credit }}</a>@else{{ $story->image_credit }}@endif</div>
+        @endif
     </div>
 </article>

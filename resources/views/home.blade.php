@@ -37,16 +37,23 @@
             <div class="lead-carousel" data-carousel data-carousel-interval="7000" aria-label="Featured stories">
                 @foreach ($featuredStories as $slide => $featured)
                     <article class="lead-story feature-slide {{ $slide === 0 ? 'is-active' : '' }}" data-carousel-slide @if ($slide !== 0) hidden @endif>
-                        <a class="lead-image" href="{{ route('articles.show', $featured->slug) }}" aria-label="{{ $featured->title }}">
-                            @if ($featured->cover_image)
-                                <img src="{{ asset('storage/'.$featured->cover_image) }}" alt="{{ $featured->image_alt ?: $featured->title }}" @if ($slide > 0) loading="lazy" @endif>
-                            @else
-                                <span class="lead-placeholder"><b>N</b><i></i><small>MALAWI · AFRICA · WORLD</small></span>
+                        <div class="lead-image">
+                            <a class="lead-image-story" href="{{ route('articles.show', $featured->slug) }}" aria-label="{{ $featured->title }}">
+                                @if ($featured->cover_image)
+                                    <img src="{{ asset('storage/'.$featured->cover_image) }}" alt="{{ $featured->image_alt ?: $featured->title }}" @if ($slide > 0) loading="lazy" @endif>
+                                @else
+                                    <span class="lead-placeholder"><b>N</b><i></i><small>MALAWI · AFRICA · WORLD</small></span>
+                                @endif
+                                <span class="lead-category">{{ $featured->category->name }}</span>
+                            </a>
+                            @if ($featured->image_credit)
+                                <p class="lead-image-caption">
+                                    <span>Photo taken by @if ($featured->image_credit_url)<a href="{{ $featured->image_credit_url }}" target="_blank" rel="noopener noreferrer">{{ $featured->image_credit }}</a>@else{{ $featured->image_credit }}@endif</span>
+                                </p>
                             @endif
-                            <span class="lead-category">{{ $featured->category->name }}</span>
-                        </a>
+                        </div>
                         <div class="lead-copy">
-                            <div class="story-meta"><span>{{ $featured->category->name }}</span><time datetime="{{ $featured->published_at->toIso8601String() }}">{{ $featured->published_at->format('d M Y · H:i') }} CAT</time></div>
+                            <div class="story-meta"><span>{{ $featured->category->name }}</span><time datetime="{{ $featured->published_at->toIso8601String() }}">{{ $featured->published_at->format('d M Y') }}@if ($featured->published_at->format('H:i:s') !== '00:00:00') · {{ $featured->published_at->format('H:i') }} CAT @endif</time></div>
                             <h2><a href="{{ route('articles.show', $featured->slug) }}">{{ $featured->title }}</a></h2>
                             <p>{{ $featured->excerpt }}</p>
                             <a class="text-link" href="{{ route('articles.show', $featured->slug) }}">Read the full story <span>→</span></a>

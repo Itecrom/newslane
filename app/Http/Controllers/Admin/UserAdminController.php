@@ -9,7 +9,6 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
-use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
 
@@ -27,7 +26,7 @@ class UserAdminController extends Controller
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
             'email' => ['required', 'email:rfc', 'max:254', 'unique:users,email'],
-            'role' => ['required', Rule::in(['admin', 'editor'])],
+            'role' => ['required', Rule::in(['admin', 'editor', 'reporter', 'intern'])],
             'password' => ['required', 'confirmed', Password::min(12)->letters()->mixedCase()->numbers()->symbols()],
         ]);
         $data['password'] = Hash::make($data['password']);
@@ -40,7 +39,7 @@ class UserAdminController extends Controller
     public function update(Request $request, User $user): RedirectResponse
     {
         $data = $request->validate([
-            'role' => ['required', Rule::in(['admin', 'editor'])],
+            'role' => ['required', Rule::in(['admin', 'editor', 'reporter', 'intern'])],
             'is_active' => ['required', 'boolean'],
         ]);
         $isActive = $request->boolean('is_active');

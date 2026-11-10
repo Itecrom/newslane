@@ -14,7 +14,7 @@ class EnsureEditorialAccess
             return redirect()->route('admin.login');
         }
 
-        if (! $request->user()->is_active || ! in_array($request->user()->role, ['admin', 'editor'], true)) {
+        if (! $request->user()->is_active || ! in_array($request->user()->role, ['admin', 'editor', 'reporter', 'intern'], true)) {
             abort(403);
         }
 

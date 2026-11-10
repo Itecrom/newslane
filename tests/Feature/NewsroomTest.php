@@ -2,22 +2,27 @@
 
 namespace Tests\Feature;
 
-use App\Models\Article;
+use App\Jobs\PublishArticleToFacebook;
+use App\Mail\ContactSubmissionNotification;
 use App\Models\Advertisement;
+use App\Models\Article;
 use App\Models\Category;
 use App\Models\Comment;
 use App\Models\ContactMessage;
 use App\Models\LiveEvent;
 use App\Models\Subscriber;
 use App\Models\User;
-use App\Mail\ContactSubmissionNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\Client\Request;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Mail;
+use Illuminate\Support\Facades\Queue;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\URL;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Tests\TestCase;
 
@@ -34,12 +39,88 @@ class NewsroomTest extends TestCase
             ->assertOk()
             ->assertSee($article->title)
             ->assertSee(route('category.show', 'politics'))
+            ->assertSee('https://facebook.com/newslanemw', false)
+            ->assertSee('data-theme-toggle', false)
             ->assertHeader('X-Content-Type-Options', 'nosniff')
             ->assertHeader('Content-Security-Policy');
 
         $this->get(route('category.show', 'politics'))
             ->assertOk()
             ->assertSee($article->title);
+    }
+
+    public function test_topbar_shows_africa_forecast_and_malawi_conditions_and_caches_provider_response(): void
+    {
+        config(['weather.open_meteo.api_key' => 'test-commercial-weather-key']);
+        $this->clearWeatherCache();
+        Http::preventStrayRequests();
+        Http::fake([
+            'customer-api.open-meteo.com/v1/forecast*' => Http::response($this->weatherForecastPayload()),
+        ]);
+
+        $this->get(route('home'))
+            ->assertOk()
+            ->assertSee('Africa forecast', false)
+            ->assertSee('Lusaka 26°C', false)
+            ->assertSee('Across Africa')
+            ->assertSee('Malawi')
+            ->assertSee('Current conditions')
+            ->assertSee('3-day forecast');
+
+        $this->get(route('contact'))
+            ->assertOk()
+            ->assertSee('Across Africa')
+            ->assertSee('Blantyre')
+            ->assertSee('Lusaka')
+            ->assertSee('3-day forecast', false);
+
+        $this->get(route('weather.widget'))
+            ->assertOk()
+            ->assertHeader('Cache-Control', 'no-store, private')
+            ->assertSee('Lusaka 26°C', false);
+
+        Http::assertSentCount(1);
+        Http::assertSent(fn ($request): bool => str_contains($request->url(), 'customer-api.open-meteo.com/v1/forecast')
+            && $request['apikey'] === 'test-commercial-weather-key');
+    }
+
+    public function test_weather_widget_reports_unavailable_without_a_provider_key_or_live_response(): void
+    {
+        config(['weather.open_meteo.api_key' => null]);
+        $this->clearWeatherCache();
+        Http::preventStrayRequests();
+
+        $this->get(route('home'))
+            ->assertOk()
+            ->assertSee('Live weather is temporarily unavailable.')
+            ->assertSee('OFFLINE');
+
+        Http::assertNothingSent();
+    }
+
+    public function test_weather_widget_uses_the_last_available_forecast_if_the_provider_fails(): void
+    {
+        config(['weather.open_meteo.api_key' => 'test-commercial-weather-key']);
+        $this->clearWeatherCache();
+        $requestCount = 0;
+        Http::preventStrayRequests();
+        Http::fake([
+            'customer-api.open-meteo.com/v1/forecast*' => function () use (&$requestCount) {
+                $requestCount++;
+
+                return $requestCount === 1
+                    ? Http::response($this->weatherForecastPayload())
+                    : Http::response([], 503);
+            },
+        ]);
+
+        $this->get(route('home'))->assertOk()->assertSee('Lusaka 26°C', false);
+        Cache::forget(config('weather.open_meteo.cache_key'));
+
+        $this->get(route('home'))
+            ->assertOk()
+            ->assertSee('Showing last available update')
+            ->assertSee('Lusaka 26°C', false);
     }
 
     public function test_newsroom_seeds_sections_for_jobs_technology_entertainment_and_business(): void
@@ -69,6 +150,9 @@ class NewsroomTest extends TestCase
             'breaking' => true,
             'cover_image' => 'articles/one.jpg',
             'image_alt' => 'An editorial photograph of a public event',
+            'image_caption' => 'Illustrative image from a 2025 Malawi-Zambia friendly.',
+            'image_credit' => 'ChaloNiZambia · CC BY-SA 4.0 · Resized',
+            'image_credit_url' => 'https://commons.wikimedia.org/wiki/File:2025-02-25_Women_Association_Football_Zambia_-_Malawi_match_27.jpg',
         ]);
         $this->publishedArticle($category, [
             'title' => 'Featured newsroom story two',
@@ -94,7 +178,12 @@ class NewsroomTest extends TestCase
             ->assertSee('Breaking')
             ->assertSee('Most read')
             ->assertSee('Entertainment')
-            ->assertSee($first->image_alt)
+            ->assertDontSee('Illustrative image')
+            ->assertDontSee($first->image_caption)
+            ->assertSee('Photo taken by ', false)
+            ->assertSee('ChaloNiZambia · CC BY-SA 4.0')
+            ->assertDontSee('resized from original')
+            ->assertSee($first->image_credit_url, false)
             ->assertSee($event->video_embed_url)
             ->assertHeader('Content-Security-Policy');
 
@@ -103,12 +192,13 @@ class NewsroomTest extends TestCase
 
     public function test_public_story_uses_root_slug_and_search_metadata(): void
     {
-        $article = $this->publishedArticle();
+        $article = $this->publishedArticle(overrides: ['published_at' => now()->startOfDay()]);
 
         $this->get(route('articles.show', $article->slug))
             ->assertOk()
             ->assertSee('<meta property="og:title" content="'.$article->title.'">', false)
-            ->assertSee(route('articles.show', $article->slug), false);
+            ->assertSee(route('articles.show', $article->slug), false)
+            ->assertDontSee('00:00 CAT');
 
         $this->get(route('search', ['q' => 'Malawi']))
             ->assertOk()
@@ -117,6 +207,51 @@ class NewsroomTest extends TestCase
         $this->get(route('sitemap'))
             ->assertOk()
             ->assertSee(route('articles.show', $article->slug), false);
+    }
+
+    public function test_editors_can_embed_youtube_videos_without_accepting_external_frames(): void
+    {
+        $editor = User::create([
+            'name' => 'Desk Editor',
+            'email' => 'video-editor@example.test',
+            'password' => Hash::make('A-long-test-password-2026!'),
+            'role' => 'editor',
+        ]);
+        $category = Category::create(['name' => 'Opinion', 'slug' => 'opinion']);
+        $youtubeEmbed = 'https://www.youtube-nocookie.com/embed/7yFZ0NfGmrU';
+
+        $this->actingAs($editor)->get(route('admin.articles.create'))
+            ->assertOk()
+            ->assertSee('name="video_url"', false);
+
+        $this->actingAs($editor)->post(route('admin.articles.store'), [
+            'title' => 'Afrobarometer Round 11 results at BICC',
+            'category_id' => $category->id,
+            'excerpt' => 'NEWSLANE’s video coverage of the Afrobarometer Round 11 results dissemination in Lilongwe.',
+            'body' => 'Watch NEWSLANE’s coverage of the Round 11 results dissemination at BICC in Lilongwe.',
+            'status' => 'published',
+            'video_url' => 'https://youtu.be/7yFZ0NfGmrU',
+        ])->assertRedirect(route('admin.articles.index'));
+
+        $article = Article::where('title', 'Afrobarometer Round 11 results at BICC')->firstOrFail();
+        $this->assertSame($youtubeEmbed, $article->video_embed_url);
+        $response = $this->get(route('articles.show', $article->slug))
+            ->assertOk()
+            ->assertSee('<iframe src="'.$youtubeEmbed.'"', false)
+            ->assertSee('title="Afrobarometer Round 11 results at BICC video"', false)
+            ->assertHeader('Content-Security-Policy');
+        $this->assertStringContainsString('https://www.youtube-nocookie.com', $response->headers->get('Content-Security-Policy'));
+
+        $this->put(route('admin.articles.update', $article), [
+            'title' => 'Afrobarometer Round 11 results at BICC',
+            'category_id' => $category->id,
+            'excerpt' => 'NEWSLANE’s video coverage of the Afrobarometer Round 11 results dissemination in Lilongwe.',
+            'body' => 'Watch NEWSLANE’s coverage of the Round 11 results dissemination at BICC in Lilongwe.',
+            'status' => 'published',
+            'video_url' => 'https://video-attacker.example/embed/7yFZ0NfGmrU',
+        ])->assertSessionHasErrors('video_url');
+
+        $this->assertSame($youtubeEmbed, $article->fresh()->video_embed_url);
     }
 
     public function test_drafts_and_future_articles_are_not_public(): void
@@ -145,8 +280,152 @@ class NewsroomTest extends TestCase
         $this->actingAs($reader)->get(route('admin.dashboard'))->assertForbidden();
     }
 
+    public function test_active_editor_can_update_profile_and_must_confirm_current_password(): void
+    {
+        $editor = User::create([
+            'name' => 'Desk Editor',
+            'email' => 'profile-editor@example.test',
+            'password' => Hash::make('A-long-test-password-2026!'),
+            'role' => 'editor',
+        ]);
+
+        $this->actingAs($editor)->get(route('admin.profile.edit'))
+            ->assertOk()
+            ->assertSee('Update your details');
+
+        $this->put(route('admin.profile.update'), [
+            'name' => 'Updated Desk Editor',
+            'email' => 'updated-editor@example.test',
+            'bio' => 'Reporting on public-interest stories in Malawi.',
+            'current_password' => 'A-long-test-password-2026!',
+        ])->assertRedirect()
+            ->assertSessionHas('status', 'Your profile has been updated.');
+
+        $this->assertDatabaseHas('users', [
+            'id' => $editor->id,
+            'name' => 'Updated Desk Editor',
+            'email' => 'updated-editor@example.test',
+            'bio' => 'Reporting on public-interest stories in Malawi.',
+        ]);
+
+        $this->put(route('admin.profile.update'), [
+            'name' => 'Unchanged Desk Editor',
+            'email' => 'unverified-editor@example.test',
+            'bio' => 'This change must not be stored.',
+            'current_password' => 'incorrect-password',
+        ])->assertSessionHasErrors('current_password');
+
+        $this->assertDatabaseMissing('users', ['email' => 'unverified-editor@example.test']);
+        $this->assertDatabaseHas('users', ['id' => $editor->id, 'name' => 'Updated Desk Editor']);
+    }
+
+    public function test_reporters_and_interns_can_submit_only_their_own_drafts(): void
+    {
+        $category = Category::create(['name' => 'Malawi', 'slug' => 'malawi']);
+        $reporter = User::create([
+            'name' => 'Staff Reporter',
+            'email' => 'reporter@example.test',
+            'password' => Hash::make('A-long-test-password-2026!'),
+            'role' => 'reporter',
+        ]);
+        $intern = User::create([
+            'name' => 'Newsroom Intern',
+            'email' => 'intern@example.test',
+            'password' => Hash::make('A-long-test-password-2026!'),
+            'role' => 'intern',
+        ]);
+
+        $this->actingAs($reporter)->get(route('admin.articles.create'))
+            ->assertOk()
+            ->assertSee('Your submissions are private drafts for editorial review.')
+            ->assertDontSee('name="published_at"', false)
+            ->assertDontSee('name="featured"', false);
+
+        $this->post(route('admin.articles.store'), [
+            'title' => 'Reporter original field notes',
+            'category_id' => $category->id,
+            'excerpt' => 'A concise summary supplied by a newsroom reporter.',
+            'body' => 'An original account submitted for desk review.',
+            'status' => 'draft',
+        ])->assertRedirect(route('admin.articles.index'));
+
+        $reporterDraft = Article::where('title', 'Reporter original field notes')->firstOrFail();
+        $this->assertSame('draft', $reporterDraft->status);
+        $this->assertSame($reporter->id, $reporterDraft->user_id);
+        $this->assertNull($reporterDraft->published_at);
+        $this->assertFalse($reporterDraft->featured);
+
+        $this->put(route('admin.articles.update', $reporterDraft), [
+            'title' => 'Reporter tries to publish',
+            'category_id' => $category->id,
+            'excerpt' => 'A concise summary supplied by a newsroom reporter.',
+            'body' => 'An original account submitted for desk review.',
+            'status' => 'published',
+        ])->assertSessionHasErrors('status');
+
+        $this->put(route('admin.articles.update', $reporterDraft), [
+            'title' => 'Reporter attempts to feature a story',
+            'category_id' => $category->id,
+            'excerpt' => 'A concise summary supplied by a newsroom reporter.',
+            'body' => 'An original account submitted for desk review.',
+            'status' => 'draft',
+            'featured' => '1',
+        ])->assertSessionHasErrors('featured');
+
+        $otherDraft = $this->publishedArticle($category, ['status' => 'draft', 'user_id' => $intern->id, 'published_at' => null]);
+        $this->get(route('admin.articles.edit', $otherDraft))->assertForbidden();
+        $this->actingAs($intern)->get(route('admin.articles.edit', $reporterDraft))->assertForbidden();
+        $this->delete(route('admin.articles.destroy', $reporterDraft))->assertForbidden();
+        $this->actingAs($intern)->get(route('admin.comments.index'))->assertForbidden();
+        $this->get(route('admin.ads.index'))->assertForbidden();
+        $this->get(route('admin.live.index'))->assertForbidden();
+    }
+
+    public function test_only_administrators_can_manage_google_adsense_and_the_loader_respects_the_setting(): void
+    {
+        $editor = User::create([
+            'name' => 'Desk Editor',
+            'email' => 'adsense-editor@example.test',
+            'password' => Hash::make('A-long-test-password-2026!'),
+            'role' => 'editor',
+        ]);
+        $admin = User::create([
+            'name' => 'Site Administrator',
+            'email' => 'adsense-admin@example.test',
+            'password' => Hash::make('A-long-test-password-2026!'),
+            'role' => 'admin',
+        ]);
+        config(['services.adsense.client_id' => 'ca-pub-4801370358631853']);
+
+        $this->actingAs($editor)->get(route('admin.adsense.edit'))->assertForbidden();
+
+        $this->actingAs($admin)->get(route('admin.adsense.edit'))
+            ->assertOk()
+            ->assertSee('ca-pub-4801370358631853')
+            ->assertDontSee('pagead2.googlesyndication.com/pagead/js/adsbygoogle.js');
+
+        $this->actingAs($admin)->put(route('admin.adsense.update'), ['enabled' => '0'])->assertRedirect();
+        $this->assertDatabaseHas('adsense_settings', ['id' => 1, 'enabled' => false]);
+        $this->get(route('home'))->assertOk()->assertDontSee('pagead2.googlesyndication.com/pagead/js/adsbygoogle.js');
+
+        $this->put(route('admin.adsense.update'), ['enabled' => '1'])->assertRedirect();
+        $response = $this->get(route('home'))
+            ->assertOk()
+            ->assertSee('https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-4801370358631853', false)
+            ->assertHeader('Content-Security-Policy');
+        $this->assertStringContainsString('https://googleads.g.doubleclick.net', $response->headers->get('Content-Security-Policy'));
+    }
+
     public function test_editor_can_publish_and_reader_comments_are_moderated(): void
     {
+        config([
+            'app.url' => 'https://newslane.africa',
+            'services.facebook_page.page_id' => '1234567890',
+            'services.facebook_page.page_access_token' => 'test-page-access-token',
+            'services.facebook_page.graph_api_version' => 'v27.0',
+        ]);
+        Queue::fake([PublishArticleToFacebook::class]);
+
         $editor = User::create([
             'name' => 'Desk Editor',
             'email' => 'editor@example.test',
@@ -154,6 +433,7 @@ class NewsroomTest extends TestCase
             'role' => 'editor',
         ]);
         $category = Category::create(['name' => 'Malawi', 'slug' => 'malawi']);
+        Storage::fake('public');
 
         $this->actingAs($editor)->post(route('admin.articles.store'), [
             'title' => 'A newsroom test story',
@@ -161,11 +441,31 @@ class NewsroomTest extends TestCase
             'excerpt' => 'A concise summary for the front page.',
             'body' => 'This is a sufficiently long newsroom test story.',
             'status' => 'published',
+            'cover' => UploadedFile::fake()->image('cover.jpg'),
+            'image_alt' => 'A descriptive image alt text.',
+            'image_caption' => 'An illustrative newsroom photograph.',
+            'image_credit' => 'Photographer Name · CC BY-SA 4.0 · Resized',
+            'image_credit_url' => 'https://commons.wikimedia.org/wiki/File:Example.jpg',
         ])->assertRedirect(route('admin.articles.index'));
 
         $article = Article::where('title', 'A newsroom test story')->firstOrFail();
         $this->assertSame('a-newsroom-test-story', $article->slug);
-        $this->get(route('articles.show', $article->slug))->assertOk();
+        Storage::disk('public')->assertExists($article->cover_image);
+        $this->assertSame('An illustrative newsroom photograph.', $article->image_caption);
+        $this->assertSame('Photographer Name · CC BY-SA 4.0 · Resized', $article->image_credit);
+        $this->assertSame('https://commons.wikimedia.org/wiki/File:Example.jpg', $article->image_credit_url);
+        $this->assertSame('pending', $article->facebook_post_status);
+        Queue::assertPushed(PublishArticleToFacebook::class, fn (PublishArticleToFacebook $job): bool => $job->articleId === $article->id);
+        $this->get(route('articles.show', $article->slug))
+            ->assertOk()
+            ->assertSee('<meta property="og:image" content="'.asset('storage/'.$article->cover_image).'">', false)
+            ->assertSee('<meta property="og:image:alt" content="A descriptive image alt text.">', false)
+            ->assertDontSee($article->image_caption)
+            ->assertDontSee('Illustrative image')
+            ->assertSee('Photo taken by ', false)
+            ->assertSee('Photographer Name · CC BY-SA 4.0')
+            ->assertDontSee('resized from original')
+            ->assertSee($article->image_credit_url, false);
 
         $this->post(route('articles.comments.store', $article->slug), [
             'name' => 'Thoughtful Reader',
@@ -179,6 +479,134 @@ class NewsroomTest extends TestCase
 
         $this->actingAs($editor)->patch(route('admin.comments.approve', $comment))->assertRedirect();
         $this->get(route('articles.show', $article->slug))->assertSee('A constructive comment for moderation.');
+    }
+
+    public function test_facebook_job_publishes_article_link_and_saves_the_returned_post_id(): void
+    {
+        config([
+            'app.url' => 'https://newslane.africa',
+            'services.facebook_page.page_id' => '1234567890',
+            'services.facebook_page.page_access_token' => 'test-page-access-token',
+            'services.facebook_page.graph_api_version' => 'v27.0',
+        ]);
+        Http::preventStrayRequests();
+        Http::fake([
+            'graph.facebook.com/v27.0/1234567890/feed' => Http::response(['id' => '1234567890_9876543210']),
+        ]);
+        $article = $this->publishedArticle(overrides: [
+            'slug' => 'facebook-link-preview-story',
+            'title' => 'A Facebook link preview story',
+            'excerpt' => 'A short story summary for Facebook readers.',
+        ]);
+        $article->forceFill(['facebook_post_status' => 'pending'])->save();
+
+        (new PublishArticleToFacebook($article->id, $article->published_at->timestamp))->handle();
+
+        $article->refresh();
+        $this->assertSame('posted', $article->facebook_post_status);
+        $this->assertSame('1234567890_9876543210', $article->facebook_post_id);
+        $this->assertNotNull($article->facebook_posted_at);
+        $this->assertNull($article->facebook_post_error);
+        Http::assertSent(fn (Request $request): bool => $request->url() === 'https://graph.facebook.com/v27.0/1234567890/feed'
+            && $request['access_token'] === 'test-page-access-token'
+            && $request['message'] === "A Facebook link preview story\n\nA short story summary for Facebook readers."
+            && $request['link'] === 'https://newslane.africa/facebook-link-preview-story');
+
+        (new PublishArticleToFacebook($article->id, $article->published_at->timestamp))->handle();
+        Http::assertSentCount(1);
+    }
+
+    public function test_facebook_job_records_api_rejection_without_exposing_the_access_token(): void
+    {
+        config([
+            'app.url' => 'https://newslane.africa',
+            'services.facebook_page.page_id' => '1234567890',
+            'services.facebook_page.page_access_token' => 'sensitive-test-page-token',
+            'services.facebook_page.graph_api_version' => 'v27.0',
+        ]);
+        Http::preventStrayRequests();
+        Http::fake([
+            'graph.facebook.com/v27.0/1234567890/feed' => Http::response(['error' => ['message' => 'Permission denied.']], 403),
+        ]);
+        $article = $this->publishedArticle();
+        $article->forceFill(['facebook_post_status' => 'pending'])->save();
+
+        (new PublishArticleToFacebook($article->id, $article->published_at->timestamp))->handle();
+
+        $article->refresh();
+        $this->assertSame('failed', $article->facebook_post_status);
+        $this->assertSame('Facebook rejected the post (HTTP 403). Check the Page access token and permissions.', $article->facebook_post_error);
+        $this->assertStringNotContainsString('sensitive-test-page-token', $article->facebook_post_error);
+        $this->assertNull($article->facebook_post_id);
+    }
+
+    public function test_scheduled_articles_queue_facebook_posts_for_their_publication_time(): void
+    {
+        $this->freezeTime();
+        $publishedAt = now()->addHour()->startOfMinute();
+        config([
+            'services.facebook_page.page_id' => '1234567890',
+            'services.facebook_page.page_access_token' => 'test-page-access-token',
+            'services.facebook_page.graph_api_version' => 'v27.0',
+        ]);
+        Queue::fake([PublishArticleToFacebook::class]);
+        $editor = User::create([
+            'name' => 'Desk Editor',
+            'email' => 'scheduled-facebook-editor@example.test',
+            'password' => Hash::make('A-long-test-password-2026!'),
+            'role' => 'editor',
+        ]);
+        $category = Category::create(['name' => 'Malawi', 'slug' => 'malawi']);
+
+        $this->actingAs($editor)->post(route('admin.articles.store'), [
+            'title' => 'A scheduled Facebook story',
+            'category_id' => $category->id,
+            'excerpt' => 'A summary for this scheduled story.',
+            'body' => 'This scheduled article will be automatically shared when it goes live.',
+            'status' => 'published',
+            'published_at' => $publishedAt->format('Y-m-d\TH:i'),
+        ])->assertRedirect(route('admin.articles.index'));
+
+        $article = Article::where('title', 'A scheduled Facebook story')->firstOrFail();
+        Queue::assertPushed(
+            PublishArticleToFacebook::class,
+            fn (PublishArticleToFacebook $job): bool => $job->articleId === $article->id
+                && $job->publicationTimestamp === $publishedAt->timestamp
+                && $job->delay instanceof \DateTimeInterface
+                && $job->delay->getTimestamp() === $publishedAt->timestamp,
+        );
+    }
+
+    public function test_publishing_without_facebook_credentials_records_that_sharing_is_not_configured(): void
+    {
+        config([
+            'services.facebook_page.page_id' => null,
+            'services.facebook_page.page_access_token' => null,
+        ]);
+        Queue::fake([PublishArticleToFacebook::class]);
+        $editor = User::create([
+            'name' => 'Desk Editor',
+            'email' => 'unconfigured-facebook-editor@example.test',
+            'password' => Hash::make('A-long-test-password-2026!'),
+            'role' => 'editor',
+        ]);
+        $category = Category::create(['name' => 'Malawi', 'slug' => 'malawi']);
+
+        $this->actingAs($editor)->post(route('admin.articles.store'), [
+            'title' => 'A story without Facebook configuration',
+            'category_id' => $category->id,
+            'excerpt' => 'This article can still be published on the website.',
+            'body' => 'The website publication must not fail when Facebook credentials are missing.',
+            'status' => 'published',
+        ])->assertRedirect(route('admin.articles.index'));
+
+        $article = Article::where('title', 'A story without Facebook configuration')->firstOrFail();
+        $this->assertSame('not_configured', $article->facebook_post_status);
+        $this->assertSame(
+            'Set a Facebook Page ID and Page access token in the application environment to enable automatic sharing.',
+            $article->facebook_post_error,
+        );
+        Queue::assertNotPushed(PublishArticleToFacebook::class);
     }
 
     public function test_editorial_dashboard_manages_live_coverage_and_ads(): void
@@ -452,5 +880,32 @@ class NewsroomTest extends TestCase
             'status' => 'published',
             'published_at' => now()->subMinute(),
         ], $overrides));
+    }
+
+    private function weatherForecastPayload(): array
+    {
+        $today = now()->toDateString();
+
+        return array_map(fn (): array => [
+            'current' => [
+                'temperature_2m' => 26.4,
+                'relative_humidity_2m' => 57,
+                'apparent_temperature' => 27.1,
+                'weather_code' => 2,
+                'wind_speed_10m' => 8.5,
+            ],
+            'daily' => [
+                'time' => [$today, now()->addDay()->toDateString(), now()->addDays(2)->toDateString()],
+                'weather_code' => [2, 61, 0],
+                'temperature_2m_max' => [29.5, 31, 30],
+                'temperature_2m_min' => [19, 20.5, 18.3],
+            ],
+        ], config('weather.locations'));
+    }
+
+    private function clearWeatherCache(): void
+    {
+        Cache::forget(config('weather.open_meteo.cache_key'));
+        Cache::forget(config('weather.open_meteo.last_success_cache_key'));
     }
 }

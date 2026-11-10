@@ -26,10 +26,20 @@
                     @if ($article->breaking)<span class="breaking-pill">BREAKING</span>@endif
                     <h1>{{ $article->title }}</h1>
                     <p class="article-deck">{{ $article->excerpt }}</p>
-                    <div class="article-byline"><span class="author-avatar">{{ strtoupper(substr($article->author->name, 0, 1)) }}</span><div><strong>{{ $article->author->name }}</strong><time datetime="{{ $article->published_at->toIso8601String() }}">{{ $article->published_at->format('l, d F Y · H:i') }} CAT</time></div><span class="article-views">{{ number_format($article->views) }} reads</span></div>
+                    <div class="article-byline"><span class="author-avatar">{{ strtoupper(substr($article->author->name, 0, 1)) }}</span><div><strong>{{ $article->author->name }}</strong><time datetime="{{ $article->published_at->toIso8601String() }}">{{ $article->published_at->format('l, d F Y') }}@if ($article->published_at->format('H:i:s') !== '00:00:00') · {{ $article->published_at->format('H:i') }} CAT @endif</time></div><span class="article-views">{{ number_format($article->views) }} reads</span></div>
                 </header>
                 @if ($article->cover_image)
-                    <figure class="article-cover"><img src="{{ asset('storage/'.$article->cover_image) }}" alt="{{ $article->image_alt ?: $article->title }}"><figcaption>{{ $article->image_alt ?: $article->title }} <span>NEWSLANE</span></figcaption></figure>
+                    <figure class="article-cover">
+                        <img src="{{ asset('storage/'.$article->cover_image) }}" alt="{{ $article->image_alt ?: $article->title }}">
+                        @if ($article->image_credit)
+                            <figcaption>
+                                <span>Photo taken by @if ($article->image_credit_url)<a href="{{ $article->image_credit_url }}" target="_blank" rel="noopener noreferrer">{{ $article->image_credit }}</a>@else{{ $article->image_credit }}@endif</span>
+                            </figcaption>
+                        @endif
+                    </figure>
+                @endif
+                @if ($article->video_embed_url)
+                    <div class="live-detail-video"><iframe src="{{ $article->video_embed_url }}" title="{{ $article->title }} video" loading="lazy" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe></div>
                 @endif
                 <div class="article-body">{!! nl2br(e($article->body)) !!}</div>
                 @if ($article->source_name)

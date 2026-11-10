@@ -1,12 +1,15 @@
 <?php
 
+use App\Http\Controllers\Admin\AdsenseAdminController;
 use App\Http\Controllers\Admin\AdvertisementAdminController;
 use App\Http\Controllers\Admin\ArticleAdminController;
 use App\Http\Controllers\Admin\AuthController;
 use App\Http\Controllers\Admin\CategoryAdminController;
 use App\Http\Controllers\Admin\CommentAdminController;
+use App\Http\Controllers\Admin\ContactMessageAdminController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\LiveAdminController;
+use App\Http\Controllers\Admin\ProfileController;
 use App\Http\Controllers\Admin\UserAdminController;
 use App\Http\Controllers\ArticleController;
 use App\Http\Controllers\CategoryController;
@@ -15,9 +18,10 @@ use App\Http\Controllers\HomeController;
 use App\Http\Controllers\LiveController;
 use App\Http\Controllers\NewsletterController;
 use App\Http\Controllers\SearchController;
+use App\Http\Controllers\WeatherWidgetController;
 use App\Models\Article;
+use App\Models\Category;
 use Illuminate\Support\Facades\Route;
-use Illuminate\Support\Facades\URL;
 
 Route::get('/', HomeController::class)->name('home');
 Route::get('/category/{category:slug}', [CategoryController::class, 'show'])->name('category.show');
@@ -36,10 +40,13 @@ Route::get('/login', fn () => redirect()->route('admin.login'))->name('login');
 
 Route::get('/sitemap.xml', function () {
     $articles = Article::published()->latest('published_at')->get(['slug', 'updated_at']);
-    $categories = \App\Models\Category::orderBy('position')->get(['slug']);
+    $categories = Category::orderBy('position')->get(['slug']);
 
     return response()->view('sitemap', compact('articles', 'categories'))->header('Content-Type', 'application/xml; charset=UTF-8');
 })->name('sitemap');
+Route::get('/weather/widget', WeatherWidgetController::class)
+    ->middleware('throttle:30,1')
+    ->name('weather.widget');
 
 Route::prefix('admin')->name('admin.')->group(function (): void {
     Route::get('/login', [AuthController::class, 'create'])->middleware('guest')->name('login');
@@ -48,33 +55,38 @@ Route::prefix('admin')->name('admin.')->group(function (): void {
 
     Route::middleware(['auth', 'editorial'])->group(function (): void {
         Route::get('/', DashboardController::class)->name('dashboard');
+        Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
+        Route::put('/profile', [ProfileController::class, 'update'])->name('profile.update');
         Route::get('/articles', [ArticleAdminController::class, 'index'])->name('articles.index');
         Route::get('/articles/create', [ArticleAdminController::class, 'create'])->name('articles.create');
         Route::post('/articles', [ArticleAdminController::class, 'store'])->name('articles.store');
         Route::get('/articles/{article}/edit', [ArticleAdminController::class, 'edit'])->name('articles.edit');
         Route::put('/articles/{article}', [ArticleAdminController::class, 'update'])->name('articles.update');
         Route::delete('/articles/{article}', [ArticleAdminController::class, 'destroy'])->name('articles.destroy');
-        Route::get('/categories', [CategoryAdminController::class, 'index'])->name('categories.index');
-        Route::post('/categories', [CategoryAdminController::class, 'store'])->name('categories.store');
-        Route::put('/categories/{category}', [CategoryAdminController::class, 'update'])->name('categories.update');
-        Route::delete('/categories/{category}', [CategoryAdminController::class, 'destroy'])->name('categories.destroy');
-        Route::get('/comments', [CommentAdminController::class, 'index'])->name('comments.index');
-        Route::patch('/comments/{comment}/approve', [CommentAdminController::class, 'approve'])->name('comments.approve');
-        Route::delete('/comments/{comment}', [CommentAdminController::class, 'destroy'])->name('comments.destroy');
-        Route::get('/advertisements', [AdvertisementAdminController::class, 'index'])->name('ads.index');
-        Route::post('/advertisements', [AdvertisementAdminController::class, 'store'])->name('ads.store');
-        Route::put('/advertisements/{advertisement}', [AdvertisementAdminController::class, 'update'])->name('ads.update');
-        Route::delete('/advertisements/{advertisement}', [AdvertisementAdminController::class, 'destroy'])->name('ads.destroy');
-        Route::get('/live', [LiveAdminController::class, 'index'])->name('live.index');
-        Route::post('/live', [LiveAdminController::class, 'store'])->name('live.store');
-        Route::patch('/live/{event}/close', [LiveAdminController::class, 'update'])->name('live.close');
-        Route::post('/live/{event}/updates', [LiveAdminController::class, 'addUpdate'])->name('live.updates.store');
-        Route::delete('/live/{event}', [LiveAdminController::class, 'destroy'])->name('live.destroy');
+        Route::middleware('newsroom-manager')->group(function (): void {
+            Route::get('/categories', [CategoryAdminController::class, 'index'])->name('categories.index');
+            Route::post('/categories', [CategoryAdminController::class, 'store'])->name('categories.store');
+            Route::put('/categories/{category}', [CategoryAdminController::class, 'update'])->name('categories.update');
+            Route::delete('/categories/{category}', [CategoryAdminController::class, 'destroy'])->name('categories.destroy');
+            Route::get('/comments', [CommentAdminController::class, 'index'])->name('comments.index');
+            Route::patch('/comments/{comment}/approve', [CommentAdminController::class, 'approve'])->name('comments.approve');
+            Route::delete('/comments/{comment}', [CommentAdminController::class, 'destroy'])->name('comments.destroy');
+            Route::get('/advertisements', [AdvertisementAdminController::class, 'index'])->name('ads.index');
+            Route::post('/advertisements', [AdvertisementAdminController::class, 'store'])->name('ads.store');
+            Route::put('/advertisements/{advertisement}', [AdvertisementAdminController::class, 'update'])->name('ads.update');
+            Route::delete('/advertisements/{advertisement}', [AdvertisementAdminController::class, 'destroy'])->name('ads.destroy');
+            Route::get('/live', [LiveAdminController::class, 'index'])->name('live.index');
+            Route::post('/live', [LiveAdminController::class, 'store'])->name('live.store');
+            Route::patch('/live/{event}/close', [LiveAdminController::class, 'update'])->name('live.close');
+            Route::post('/live/{event}/updates', [LiveAdminController::class, 'addUpdate'])->name('live.updates.store');
+        });
         Route::middleware('administrator')->group(function (): void {
-            Route::get('/inquiries', [\App\Http\Controllers\Admin\ContactMessageAdminController::class, 'index'])->name('inquiries.index');
-            Route::get('/inquiries/{contact}', [\App\Http\Controllers\Admin\ContactMessageAdminController::class, 'show'])->name('inquiries.show');
-            Route::patch('/inquiries/{contact}', [\App\Http\Controllers\Admin\ContactMessageAdminController::class, 'update'])->name('inquiries.update');
-            Route::get('/inquiries/{contact}/attachment', [\App\Http\Controllers\Admin\ContactMessageAdminController::class, 'attachment'])->name('inquiries.attachment');
+            Route::get('/adsense', [AdsenseAdminController::class, 'edit'])->name('adsense.edit');
+            Route::put('/adsense', [AdsenseAdminController::class, 'update'])->name('adsense.update');
+            Route::get('/inquiries', [ContactMessageAdminController::class, 'index'])->name('inquiries.index');
+            Route::get('/inquiries/{contact}', [ContactMessageAdminController::class, 'show'])->name('inquiries.show');
+            Route::patch('/inquiries/{contact}', [ContactMessageAdminController::class, 'update'])->name('inquiries.update');
+            Route::get('/inquiries/{contact}/attachment', [ContactMessageAdminController::class, 'attachment'])->name('inquiries.attachment');
             Route::get('/users', [UserAdminController::class, 'index'])->name('users.index');
             Route::post('/users', [UserAdminController::class, 'store'])->name('users.store');
             Route::patch('/users/{user}', [UserAdminController::class, 'update'])->name('users.update');

@@ -1,2 +1,11 @@
 *
 !.gitignore
+!articles/
+articles/*
+!articles/cso-malawi-parliament.jpg
+!articles/gaza-flooded-tents-illustrative.jpg
+!articles/india-digital-services-aadhaar.jpg
+!articles/krakow-city-square-illustrative.jpg
+!articles/nvidia-gpu-illustrative.png
+!articles/ukraine-ship-illustrative.jpg
+!articles/women-football-malawi-zambia.jpg

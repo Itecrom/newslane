@@ -20,7 +20,7 @@ class SecurityHeaders
         $response->headers->set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
         $response->headers->set(
             'Content-Security-Policy',
-            "default-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'; frame-src https://www.youtube-nocookie.com; img-src 'self' data:; style-src 'self'; script-src 'self' 'nonce-{$nonce}'; font-src 'self'; object-src 'none'",
+            "default-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'self'; frame-src https://www.youtube-nocookie.com https://googleads.g.doubleclick.net https://tpc.googlesyndication.com; img-src 'self' data: https://pagead2.googlesyndication.com https://googleads.g.doubleclick.net https://tpc.googlesyndication.com; style-src 'self'; script-src 'self' 'nonce-{$nonce}' https://pagead2.googlesyndication.com; connect-src 'self' https://pagead2.googlesyndication.com https://googleads.g.doubleclick.net; font-src 'self'; object-src 'none'",
         );
 
         if ($request->isSecure() && app()->environment('production')) {

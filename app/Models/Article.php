@@ -18,10 +18,14 @@ class Article extends Model
         'body',
         'cover_image',
         'image_alt',
+        'image_caption',
+        'image_credit',
+        'image_credit_url',
         'status',
         'meta_description',
         'source_name',
         'source_url',
+        'video_embed_url',
         'featured',
         'breaking',
         'published_at',
@@ -33,6 +37,7 @@ class Article extends Model
             'featured' => 'boolean',
             'breaking' => 'boolean',
             'published_at' => 'datetime',
+            'facebook_posted_at' => 'datetime',
         ];
     }
 

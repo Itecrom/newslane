@@ -1,5 +1,9 @@
 <?php
 
+use App\Http\Middleware\EnsureAdministrator;
+use App\Http\Middleware\EnsureEditorialAccess;
+use App\Http\Middleware\EnsureNewsroomManagement;
+use App\Http\Middleware\SecurityHeaders;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -13,10 +17,11 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->alias([
-            'editorial' => \App\Http\Middleware\EnsureEditorialAccess::class,
-            'administrator' => \App\Http\Middleware\EnsureAdministrator::class,
+            'editorial' => EnsureEditorialAccess::class,
+            'newsroom-manager' => EnsureNewsroomManagement::class,
+            'administrator' => EnsureAdministrator::class,
         ]);
-        $middleware->append(\App\Http\Middleware\SecurityHeaders::class);
+        $middleware->append(SecurityHeaders::class);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

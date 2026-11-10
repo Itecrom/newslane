@@ -17,15 +17,27 @@
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:image" content="@yield('og_image', asset('images/newslane-brand-board.png'))">
     <meta name="theme-color" content="#0B2D6B">
+    @php($adsenseClientId = config('services.adsense.client_id'))
+    @if (! request()->routeIs('admin.*') && $adsenseEnabled && is_string($adsenseClientId) && preg_match('/^ca-pub-[0-9]+$/D', $adsenseClientId))
+        <meta name="google-adsense-account" content="{{ $adsenseClientId }}">
+        <script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client={{ $adsenseClientId }}" crossorigin="anonymous"></script>
+    @endif
     <link rel="icon" type="image/svg+xml" href="{{ asset('images/newslane-mark.svg') }}">
-    <link rel="stylesheet" href="{{ asset('css/site.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/site.css') }}?v={{ filemtime(public_path('css/site.css')) }}">
     @stack('head')
 </head>
 <body>
     <div class="topbar">
         <div class="shell topbar-inner">
             <span>Independent journalism. African perspectives.</span>
-            <span class="topbar-right"><a href="{{ route('contact') }}">Contact NEWSLANE</a> <span class="topbar-divider">|</span> Malawi <span class="dot">•</span> Africa <span class="dot">•</span> World <span class="topbar-divider">|</span> <time id="local-clock">{{ now()->timezone('Africa/Blantyre')->format('D, d M Y · H:i') }}</time> CAT</span>
+            <div class="topbar-right">
+                <a class="topbar-contact" href="{{ route('contact') }}">Contact NEWSLANE</a>
+                <span class="topbar-divider topbar-contact-divider">|</span>
+                <span class="topbar-coverage">Malawi <span class="dot">•</span> Africa <span class="dot">•</span> World</span>
+                <span class="topbar-divider topbar-date-divider">|</span>
+                <span class="topbar-date"><time id="local-clock">{{ now()->timezone('Africa/Blantyre')->format('D, d M Y · H:i') }}</time> CAT</span>
+                @include('partials.weather-widget')
+            </div>
         </div>
     </div>
 
@@ -41,6 +53,7 @@
                 <input id="site-search" type="search" name="q" value="{{ request('q') }}" placeholder="Search the news">
                 <button aria-label="Search" type="submit">⌕</button>
             </form>
+            <button class="theme-toggle" type="button" data-theme-toggle aria-label="Enable dark mode" aria-pressed="false"><span aria-hidden="true" data-theme-icon>◐</span><span class="theme-toggle-label">Dark mode</span></button>
         </div>
         <nav class="main-nav" aria-label="Main navigation">
             <div class="shell nav-inner">
@@ -79,6 +92,7 @@
                 <a href="{{ route('live.index') }}">Live coverage</a>
                 <a href="{{ route('contact') }}">Contact NEWSLANE</a>
                 <a href="{{ route('sitemap') }}">Sitemap</a>
+                <a href="https://facebook.com/newslanemw" target="_blank" rel="noopener noreferrer">Follow NEWSLANE on Facebook ↗</a>
             </div>
             <div class="footer-newsletter">
                 <strong>The NEWSLANE briefing</strong>
@@ -94,7 +108,7 @@
         <div class="shell footer-contacts"><a href="mailto:info@newslane.africa">info@newslane.africa</a><a href="mailto:sales@newslane.africa">sales@newslane.africa</a><a href="mailto:editor@newslane.africa">editor@newslane.africa</a></div>
         <div class="shell footer-bottom"><span>© {{ now()->year }} NEWSLANE. All rights reserved.</span><a href="{{ route('admin.login') }}">Editorial access</a></div>
     </footer>
-    <script src="{{ asset('js/site.js') }}" defer></script>
+    <script src="{{ asset('js/site.js') }}?v={{ filemtime(public_path('js/site.js')) }}" defer></script>
     @stack('scripts')
 </body>
 </html>

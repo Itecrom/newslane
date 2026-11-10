@@ -1,5 +1,41 @@
 const clock = document.getElementById('local-clock');
 
+const themeToggle = document.querySelector('[data-theme-toggle]');
+let savedTheme = null;
+
+try {
+    savedTheme = window.localStorage.getItem('newslane-theme');
+} catch (error) {
+    console.warn('Unable to read the saved NEWSLANE theme preference.', error);
+}
+
+const applyTheme = (theme) => {
+    document.documentElement.dataset.theme = theme;
+
+    if (themeToggle) {
+        const isDark = theme === 'dark';
+        themeToggle.setAttribute('aria-pressed', isDark ? 'true' : 'false');
+        themeToggle.setAttribute('aria-label', `Enable ${isDark ? 'light' : 'dark'} mode`);
+        themeToggle.querySelector('[data-theme-icon]').textContent = isDark ? '☀' : '◐';
+        themeToggle.querySelector('.theme-toggle-label').textContent = isDark ? 'Light mode' : 'Dark mode';
+    }
+};
+
+applyTheme(savedTheme === 'dark' || savedTheme === 'light'
+    ? savedTheme
+    : (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'));
+
+themeToggle?.addEventListener('click', () => {
+    const theme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
+    applyTheme(theme);
+
+    try {
+        window.localStorage.setItem('newslane-theme', theme);
+    } catch (error) {
+        console.warn('Unable to save the NEWSLANE theme preference.', error);
+    }
+});
+
 if (clock) {
     const updateClock = () => {
         clock.textContent = new Intl.DateTimeFormat('en-GB', {
@@ -16,6 +52,42 @@ if (clock) {
 
     updateClock();
     window.setInterval(updateClock, 60_000);
+}
+
+let weatherWidget = document.querySelector('[data-weather-refresh-url]');
+
+if (weatherWidget) {
+    const refreshWeather = async () => {
+        if (document.hidden) {
+            return;
+        }
+
+        try {
+            const response = await fetch(weatherWidget.dataset.weatherRefreshUrl, {
+                headers: { Accept: 'text/html' },
+                cache: 'no-store',
+            });
+
+            if (!response.ok) {
+                throw new Error(`Weather refresh returned ${response.status}`);
+            }
+
+            const page = new DOMParser().parseFromString(await response.text(), 'text/html');
+            const replacement = page.querySelector('[data-weather-refresh-url]');
+
+            if (!replacement) {
+                throw new Error('Weather refresh did not return the forecast widget.');
+            }
+
+            replacement.open = weatherWidget.open;
+            weatherWidget.replaceWith(replacement);
+            weatherWidget = replacement;
+        } catch (error) {
+            console.error('Unable to refresh the live weather forecast.', error);
+        }
+    };
+
+    window.setInterval(refreshWeather, 600_000);
 }
 
 document.querySelectorAll('[data-share-url]').forEach((button) => {

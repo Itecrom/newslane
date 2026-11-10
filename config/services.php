@@ -2,6 +2,17 @@
 
 return [
 
+    'adsense' => [
+        'enabled' => env('ADSENSE_ENABLED', true),
+        'client_id' => env('ADSENSE_CLIENT_ID', 'ca-pub-4801370358631853'),
+    ],
+
+    'facebook_page' => [
+        'page_id' => env('FACEBOOK_PAGE_ID'),
+        'page_access_token' => env('FACEBOOK_PAGE_ACCESS_TOKEN'),
+        'graph_api_version' => env('FACEBOOK_GRAPH_API_VERSION', 'v27.0'),
+    ],
+
     /*
     |--------------------------------------------------------------------------
     | Third Party Services
